@@ -6,17 +6,14 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %   Required input arguments:
 %       xdata:   Square-root of isopach area (km) or distance from the vent (km)
 %       ydata:   Thickness (cm) or mass load (g/m2)
-%       method:  'exponential'   (Pyle 1989, Fierstein & Nathenson 1992)
+%       fitType: 'exponential'   (Pyle 1989, Fierstein & Nathenson 1992)
 %                'powerlaw'      (Bonadonna & Houghton 2005)
 %                'weibull'       (Bonadonna & Costa 2012)
-%       deposit: 'volume' returns the deposit volume (km3) based on outcrop thickness (cm) values(cm) vs square-root of isopleth area (km)
-%                'mass' returns the deposit mass (kg) based on outcrop mass load (kg/m2) values(cm) vs square-root of isopleth area (km)
-%                'thinning' returns the deposit thinning based on outcrop thickness vs distance from the vent (km)
-%                'fining' returns the deposit thinning based on isopleth values(cm) vs square-root of isopleth area (km)
+%       Multiple fits can be specified in a cell array (Ex. {'exponential','powerlaw'})
 %
 %   Fit-specific input arguments:
-%       Exponential: 0 or 1 argumens
-%           Examples:
+%       Exponential: 0 or 1 arguments
+%           - 'BIS': 
 %           - Fit thickness data with 1 exponential segment:
 %               vExp = tephraVolume(thickness, area, 'exponential', 'volume') 
 %
@@ -55,22 +52,57 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %           the optimization ranges of the lambda and n parameters:
 %               vWBL = tephraVolume(thickness, area, 'weibull', 'volume', [0.1, 1000], [0.1, 1000])
 %
-%   Optional imput argumens passed as parameter pairs
+%   Optional imput arguments passed as parameter pairs
 %       'deposit':      Defines the type of deposit to fit
-%                       - 'volume':     Calculates the tephra volume (km3) based on Ln(Thickness) vs. Area^.5 relationship (default)
+%                       - 'volume':     Calculates the tephra volume (km3) based on Ln(Thickness) vs. sqrt isopach area relationship (default)
 %                                       xData: square-root of isopach area (km)
 %                                       yData: isopach thickness (cm)
-%                       - 'mass':       Calculates the tephra mass (kg) based on Ln(Mass accumulation) vs. Area^.5 relationship
+%                       - 'mass':       Calculates the tephra mass (kg) based on Ln(Mass accumulation) vs. sqrt isomass area relationship
 %                                       xData: square-root of isomass area (km)
 %                                       yData: isomass accumulation (kg/m2)
-%                       - 'thinning':   Thinning profile Ln(Thickness) vs. distance relationship
+%                       - 'thinning':   Thinning profile based on Ln(Thickness) vs. distance relationship
 %                                       xData: distance from source (km)
 %                                       yData: thickness (cm)
+%                       - 'fining':     Fining profile based on Ln(diameter of maximum clast) vs. sqrt isoleth area relationship
+%                                       xData: square-root of isopleth area (km)
+%                                       yData: clast diameter (cm)
 %
 %       'yscale':       Defines the scale of the yaxis   
 %                       - 'ln':         Natural log (default)
 %                       - 'log10':      Log base 10
 %                       - 'linear':     Linear
+%
+%       'maxDistancee': Defines the maximum extent of extrapolation in distal part for plotting. 1 means 100%, i.e. the distance to the most distal point is doubled
+%                       Default = 1
+%
+%       'fits2plot':    Defines which fits to plot. If passed, it should be passed as a 1xlength(fitTypes) boolean vector
+%                       Example: if fitType = {'exponential', 'powerlaw} and 'maxDistance', [1,0] is specified, only the exponential fit will be plotted
+%                       All fits are plotted by default
+%
+%       'plotType':     - 'subplot':    Plots are inside a subplot (default)
+%                       - 'separate':   Individual plots
+%
+%       'runMode':      - 'single':     Single volume fit (default)
+%                       - 'probabilistic': Monte Carlo simulations following the method of Biass et al. (2014). If  activated, the following arguments are required
+%
+%       'nbRuns':       Number of runs of the Monte Carlo simulation
+%
+%       'xError':       Error in % for each measurement in xData. Should be passed as a vector of the same size as xData.
+%                       Default is 10% on all points
+%
+%       'yError':       Error in % for each measurement in yData. Should be passed as a vector of the same size as yData.
+%                       Default is 10% on all points
+%
+%       'CError':       Error in % on the distal integration limit of the power-law. 
+%
+%       'errorType':    Error distribution around each point.
+%                       - 'normal':     Gaussian distribution where the error is 3 sigma of the distribution (default)
+%                       - 'uniform':    Uniform distribution
+%
+%       'errorBound':   Percentiles used for reporting the error. Default is [5,95] (i.e. 5th and 95th percentiles)
+%
+ 
+
 addpath('Dependencies/')
 %% Define the main storage structures
 C = struct;     % Configuration structure
@@ -83,8 +115,9 @@ C.yscale        = 'ln';                             % Scale of the y axis
 C.nbRuns        = 0;                                % Number of runs of the Monte-Carlo simulation
 C.errorType     = 'normal';                         % Error envelop
 C.errorBound    = [5,95];                           % Percentiles used for volume estimate
-C.xError        = zeros(size(xData));               % Error on xData
-C.yError        = zeros(size(yData));               % Error on yData
+C.xError        = ones(size(xData)).*10;            % Error on xData
+C.yError        = ones(size(yData)).*10;            % Error on yData
+C.CError        = 10;                               % Error on the distal integration limit
 C.runMode       = 'single';                         % Single/probabilistic mode        
 C.maxDist       = 1;                                % Defines the maximum extent of extrapolation in distal part. 1 means 100%, i.e. the distance to the most distal point is doubled
 C.fit2plot      = true(size(fitType));              % Defines which distributions to plot    
@@ -112,8 +145,8 @@ if ~isempty(findCell(varargin, 'runMode'))
     C.runMode = varargin{findCell(varargin, 'runMode')+1};
 end
 % Check maxDist
-if ~isempty(findCell(varargin, 'maxDist'))                               
-    C.maxDist = varargin{findCell(varargin, 'maxDist')+1};  
+if ~isempty(findCell(varargin, 'maxDistance'))                               
+    C.maxDist = varargin{findCell(varargin, 'maxDistance')+1};  
 end
 % Check Fits to plot
 if ~isempty(findCell(varargin, 'fit2plot'))         
@@ -299,7 +332,7 @@ if strcmp(C.plotType, 'separate')
     f2 = zeros(1,iEnd);
     for i = 1:iEnd
         f2(i)   = figure;
-        ah      = copyobj([ax{i}, ax{i}.Legend],f2(i));
+        ah      = copyobj([ax{i}, legend(ax{i})],f2(i));
         set(ah(1), 'Position',[.1,.1,.8,.8]);
     end
     delete(f)
