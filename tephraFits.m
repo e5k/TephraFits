@@ -107,6 +107,14 @@ addpath('Dependencies/')
 %% Define the main storage structures
 C = struct;     % Configuration structure
 V = struct;     % Volume structure
+% In case only one fitType, convert the char array to cell
+if ischar(fitType)
+    fitType = {fitType}; 
+end    
+
+%% Check the size of input data
+if size(xData,1) > size(xData,2); xData = xData'; end
+if size(yData,1) > size(yData,2); yData = yData'; end
 
 %% Check optional arguments
 % Set default values and defines C as the configuration structure
@@ -184,9 +192,11 @@ if strcmp(C.runMode, 'probabilistic')
     end
     
     % Check the error on C
-    if ~isempty(findCell(varargin, 'CError'))
-        C.CError = varargin{findCell(varargin, 'CError')+1};
-    else; error('The probabilistic mode is activated and requires to define the error for the distal integration limit of the power-law fit (i.e. ''CError'', in %)');
+    if ~isempty(findCell(fitType, 'powerlaw'))
+        if ~isempty(findCell(varargin, 'CError'))
+            C.CError = varargin{findCell(varargin, 'CError')+1};
+        else; error('The probabilistic mode is activated and requires to define the error for the distal integration limit of the power-law fit (i.e. ''CError'', in %)');
+        end
     end
     
     % Check errorBound
@@ -199,8 +209,7 @@ if strcmp(C.runMode, 'probabilistic')
 end
 
 %% Check required arguments
-if ischar(fitType); fitType = {fitType}; end    % In case only one fitType
-fitType                     = sort(fitType);    % Sort alphabetically
+fitType = sort(fitType);    % Sort alphabetically
 
 % Check fit types
 if isempty(findCell(fitType, 'exponential')) && isempty(findCell(fitType, 'powerlaw')) && isempty(findCell(fitType, 'weibull'))
@@ -215,7 +224,7 @@ if ~isempty(findCell(fitType, 'exponential'))
     else                                   
         V.fitProps.EXP_BIS = varargin{findCell(varargin, 'BIS')+1}; 
         % Check if more than one instance of the exponential fit is called
-        if length(findCell(fitType, 'exponential')) ~= size(V.fitProps.EXP_BIS)
+        if ~isempty(V.fitProps.EXP_BIS) & length(findCell(fitType, 'exponential')) ~= size(V.fitProps.EXP_BIS)
             error('Specify as many break-in-slopes as instances of the exponential segment');
         end
     end
@@ -529,9 +538,10 @@ if strcmpi(fitType, 'exponential')
     out.k           = Vtmp.F(:,2);
     out.I           = Vtmp.I;
     if strcmpi(C.deposit, 'fining')
-        out.bc      = .391066419./-1.*out.k;
+        % Half distance = log(2) / -k * sqrt(pi)
+        out.bc      = -1*.391066419./out.k;
     else
-        out.bt      = .391066419./-1.*out.k;
+        out.bt      = -1*.391066419./out.k;
     end
 elseif strcmpi(fitType, 'powerlaw')
     out.m           = -1*Vtmp.F(2);
@@ -568,9 +578,9 @@ if strcmpi(C.runMode, 'probabilistic')
         out.kP          = reshape(Vtmp.FP(:,2,:), size(Vtmp.FP,1),size(Vtmp.FP,3));
         out.IP          = reshape(Vtmp.IP, size(Vtmp.FP,1),size(Vtmp.FP,3));
         if strcmpi(C.deposit, 'fining')
-            out.bcP     = .391066419./-1.*out.k;
+            out.bcP     = -1*.391066419./out.k;
         else
-            out.btP     = .391066419./-1.*out.k;
+            out.btP     = -1*.391066419./out.k;
         end
     elseif strcmpi(fitType, 'powerlaw')
         out.mP          = -1.*reshape(Vtmp.FP(:,2,:), size(Vtmp.FP,1),size(Vtmp.FP,3));
@@ -627,7 +637,7 @@ disp(['Fitting ', fitType]);
 waittext(0,'init');
 if strcmp(C.runMode, 'probabilistic')
     for iR = 1:C.nbRuns
-        waittext(iR,'percent');
+        waittext(iR/C.nbRuns, 'fraction');
         if strcmpi(fitType, 'exponential')
             [R.FP(:,:,iR), R.XP(:,:,iR), R.YP(:,:,iR), R.r2P(:,:,iR), R.IP(:,:,iR), R.YmP(:,:,iR)] =...
                 fitEXP(V.xDataP(:,:,iR), V.yDataP(:,:,iR), V.fitProps.EXP_BIS, C);

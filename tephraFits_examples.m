@@ -13,4 +13,4 @@ lobe_distance   = [0.5278    0.5905    0.9964    1.4822    1.6171    1.6600    1
 % Isopleth
 isopleth_diam   = [9,7,6,5];
 isopleth_area   = [1.5500, 5.7500, 10.0000, 26.5000];
-tephraFits(sqrt(isopleth_area),isopleth_diam,{'exponential', 'powerlaw'},'deposit', 'fining', 'C', 20, 'plottype', 'separate')
+s
