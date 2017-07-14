@@ -50,7 +50,7 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %
 %           - Fit thickness data with a Weibull function manually specifying
 %           the optimization ranges of the lambda and n parameters:
-%               vWBL = tephraVolume(thickness, area, 'weibull', 'volume', [0.1, 1000], [0.1, 1000])
+%               vWBL = tephraVolume(thickness, area, 'weibull', 'volume', lambdaRange, [0.1, 1000], nRange, [0.1, 1000])
 %
 %   Optional imput arguments passed as parameter pairs
 %       'deposit':      Defines the type of deposit to fit
@@ -67,7 +67,7 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %                                       xData: square-root of isopleth area (km)
 %                                       yData: clast diameter (cm)
 %
-%       'yscale':       Defines the scale of the yaxis   
+%       'yScale':       Defines the scale of the yaxis   
 %                       - 'ln':         Natural log (default)
 %                       - 'log10':      Log base 10
 %                       - 'linear':     Linear
@@ -101,10 +101,82 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %
 %       'errorBound':   Percentiles used for reporting the error. Default is [5,95] (i.e. 5th and 95th percentiles)
 %
- 
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
+%
+%   Some examples for you guys!
+%
+%       1. VOLUME
+%           thickness   = [90, 40, 20, 10, 8, 5, 4, 3];
+%           area        = sqrt([0.48, 1.49, 2.68, 6.23, 9.76, 16.28, 26.19, 36.31]);
+%
+%           1.1 One exponential segment
+%               volume  = tephraFits(area, thickness, 'exponential')
+%
+%           1.2 Two exponential segment
+%               volume  = tephraFits(area, thickness, 'exponential', 'BIS', 3)
+%
+%           1.3 Two exponential segment and power-law with a distal integration limit = 20 km
+%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw'}, 'C', 20, 'BIS', 3)
+%
+%           1.4 Two exponential segment, power-law with a distal integration limit = 20 km and Weibull with initial optimization bounds based on the volume
+%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw', 'weibull'}, 'BIS', 3, 'C', 20)
+%
+%           1.5 Two exponential segment, power-law with a distal integration limit = 20 km and Weibull specifying initial n and lambda ranges
+%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw', 'weibull'}, 'BIS', 3, 'C', 20, 'lambdaRange', [.01 100], 'nRange', [.01 100] )
+%
+%       2. PLOTTING OPTIONS
+%
+%           2.1 Plot results as a subplot
+%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw', 'weibull'}, 'BIS', 3, 'C', 20)
+%
+%           2.2 Plot results as separate plots
+%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw', 'weibull'}, 'BIS', 3, 'C', 20, 'plotType', 'separate' )
+%
+%           2.3 Plot y axis of the thinning/finning trend as log10 (instead of natural log)
+%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw', 'weibull'}, 'BIS', 3, 'C', 20, 'yScale', 'log10' )
+%
+%           2.4 Extend the extrapolation
+%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw', 'weibull'}, 'BIS', 3, 'C', 20, 'maxDistance', 2)
+%
+%           2.5 Choose what fit to plot - here plotting only the Weibull
+%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw', 'weibull'}, 'BIS', 3, 'C', 20, 'fits2plot', [0,0,1])
+%
+%       3. PROBABILISTIC APPROACH
+%
+%           3.1 Run 100 1-segment exponential fits with an error of 10% on the area and 20% on the thickness
+%               volume  = tephraFits(area, thickness, 'exponential', 'runMode', 'probabilistic', 'nbRuns', 100, 'xError', 10, 'yError', 20 )
+%
+%           3.2 Same, but variable errors for each isopach
+%               xError  = [20,20,20,20,30,30,30,30];
+%               yError  = [10,10,10,10,20,20,20,20];
+%               volume  = tephraFits(area, thickness, 'exponential', 'runMode', 'probabilistic', 'nbRuns', 100, 'xError', xError, 'yError', yError )
+%
+%           3.3 Adding an error of 20% on the distal integration limit of the power-law
+%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw'}, 'C', 20, 'CError', 20, 'runMode', 'probabilistic', 'nbRuns', 100, 'xError', 10, 'yError', 20  )
+%
+%           3.4 Use a uniform distribution of errors instead of a Gaussian
+%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw'}, 'C', 20, 'CError', 20, 'runMode', 'probabilistic', 'nbRuns', 100, 'xError', 10, 'yError', 20, 'errorType', 'uniform' )
+%
+%           3.5 Specify custom percentiles to quantify the uncertainty on the volume
+%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw'}, 'C', 20, 'CError', 20, 'runMode', 'probabilistic', 'nbRuns', 100, 'xError', 10, 'yError', 20, 'errorBound', [2,98] )
+%
+%       4. THICKNESS vs DISTANCE
+%           thickness   = [12.5, 96, 40, 16, 14, 16, 6, 13, 7, 12, 10, 26];             % Deposit thickness (cm)
+%           distance    = [0.5, 0.6, 1, 1.5 1.6, 1.7, 1.9, 2.0, 2.1, 2.4,2.6, 1.3];     % Distance from source (km)
+%
+%           4.1 Thinning trend
+%               thinning = tephraFits(distance, thickness, {'exponential', 'powerlaw'}, 'deposit', 'thinning', 'C', 20)
+%
+%       4. FINNING TREND (ISOPLETH)
+%           diameter    = [9,7,6,5];                                                    % Isopleth diameter (cm)
+%           area        = sqrt([0.5, 0.6, 1, 1.5 1.6, 1.7, 1.9, 2.0, 2.1, 2.4,2.6, 1.3]);    % Isopleth area (km)
+%
+%           4.1 Thinning trend
+%               thinning = tephraFits(distance, thickness, {'exponential', 'powerlaw'}, 'deposit', 'thinning', 'C', 20)
+
 
 addpath('Dependencies/')
-%% Define the main storage structures
+% Define the main storage structures
 C = struct;     % Configuration structure
 V = struct;     % Volume structure
 % In case only one fitType, convert the char array to cell
@@ -113,13 +185,13 @@ if ischar(fitType)
 end    
 
 %% Check the size of input data
-if size(xData,1) > size(xData,2); xData = xData'; end
-if size(yData,1) > size(yData,2); yData = yData'; end
+% if size(xData,1) > size(xData,2); xData = xData'; end
+% if size(yData,1) > size(yData,2); yData = yData'; end
 
 %% Check optional arguments
 % Set default values and defines C as the configuration structure
 C.deposit       = 'volume';
-C.yscale        = 'ln';                             % Scale of the y axis
+C.yScale        = 'ln';                             % Scale of the y axis
 C.nbRuns        = 0;                                % Number of runs of the Monte-Carlo simulation
 C.errorType     = 'normal';                         % Error envelop
 C.errorBound    = [5,95];                           % Percentiles used for volume estimate
@@ -138,12 +210,12 @@ if ~isempty(findCell(varargin, 'deposit'))
     end
     C.deposit = varargin{findCell(varargin, 'deposit')+1};
 end
-% Check yscale
-if ~isempty(findCell(varargin, 'yscale'))                               
-    if isempty(findCell({'ln', 'log10', 'linear'}, lower(varargin{findCell(varargin, 'yscale')+1})))
-        error('yscale accepts ''ln'', ''log10'' or ''linear''');
+% Check yScale
+if ~isempty(findCell(varargin, 'yScale'))                               
+    if isempty(findCell({'ln', 'log10', 'linear'}, lower(varargin{findCell(varargin, 'yScale')+1})))
+        error('yScale accepts ''ln'', ''log10'' or ''linear''');
     end
-    C.yscale = varargin{findCell(varargin, 'yscale')+1};
+    C.yScale = varargin{findCell(varargin, 'yScale')+1};
 end
 % Check runMode
 if ~isempty(findCell(varargin, 'runMode'))                               
@@ -158,11 +230,12 @@ if ~isempty(findCell(varargin, 'maxDistance'))
 end
 % Check Fits to plot
 if ~isempty(findCell(varargin, 'fit2plot'))         
-    C.fit2plot    = logical(varargin{findCell(varargin, 'fit2plot')+1});  
+    %C.fit2plot    = logical(varargin{findCell(varargin, 'fit2plot')+1}); 
+    C.fit2plot    = logical(varargin{findCell(varargin, 'fit2plot')+1}); 
 end
 % Check plot type
-if ~isempty(findCell(varargin, 'plottype'))         
-    C.plotType    = varargin{findCell(varargin, 'plottype')+1};  
+if ~isempty(findCell(varargin, 'plotType'))         
+    C.plotType    = varargin{findCell(varargin, 'plotType')+1};  
 end
 
 % In case the probabilistic mode is activated, extra checks
@@ -172,16 +245,21 @@ if strcmp(C.runMode, 'probabilistic')
         if isempty(findCell({'uniform', 'normal'}, lower(varargin{findCell(varargin, 'errorType')+1})))
             error('errorType accepts ''uniform'' or ''normal''');
         end
-        C.runMode = varargin{findCell(varargin, 'errorType')+1};
+        C.errorType = varargin{findCell(varargin, 'errorType')+1};
     end
     
     % Check xError and yError
     if ~isempty(findCell(varargin, 'xError')) && ~isempty(findCell(varargin, 'yError'))
-        if (size(xData,1) ~= size(varargin{findCell(varargin, 'xError')+1},1)) || (size(xData,2) ~= size(varargin{findCell(varargin, 'xError')+1},2)) || (size(yData,1) ~= size(varargin{findCell(varargin, 'yError')+1},1)) ||(size(yData,2) ~= size(varargin{findCell(varargin, 'yError')+1},2))
+        if length(varargin{findCell(varargin, 'xError')+1}) == 1 && length(varargin{findCell(varargin, 'yError')+1}) == 1
+            % In case of a constant error on x and y, it is now possible to enter only one value instead of a vector
+            C.xError = ones(size(xData)).*varargin{findCell(varargin, 'xError')+1};
+            C.yError = ones(size(yData)).*varargin{findCell(varargin, 'yError')+1};
+        elseif (size(xData,1) ~= size(varargin{findCell(varargin, 'xError')+1},1)) || (size(xData,2) ~= size(varargin{findCell(varargin, 'xError')+1},2)) || (size(yData,1) ~= size(varargin{findCell(varargin, 'yError')+1},1)) ||(size(yData,2) ~= size(varargin{findCell(varargin, 'yError')+1},2))
             error('The size and dimensions of xError and yError should be the same as xData and yData');
+        else
+            C.xError = varargin{findCell(varargin, 'xError')+1};
+            C.yError = varargin{findCell(varargin, 'yError')+1};
         end
-        C.xError = varargin{findCell(varargin, 'xError')+1};
-        C.yError = varargin{findCell(varargin, 'yError')+1};
     else; error('The probabilistic mode is activated and requires to define ''xError'' and ''yError''');
     end
     
@@ -242,15 +320,14 @@ if ~isempty(findCell(fitType, 'powerlaw'))
     end
 end    
 if strcmpi(fitType, 'weibull')
-    % Check if ranges of lambda and n are specified
-    
+    % Check if ranges of lambda and n are specified    
     if ~isempty(findCell(varargin, 'lambdaRange')) && ~isempty(findCell(varargin, 'nRange'))
                                             V.fitProps.WBL_lambdaRange  = varargin{findCell(varargin, 'lambdaRange')+1}; 
                                             V.fitProps.WBL_nRange       = varargin{findCell(varargin, 'nRange')+1}; 
+    elseif (~isempty(findCell(varargin, 'lambdaRange')) && isempty(findCell(varargin, 'nRange'))) || (isempty(findCell(varargin, 'lambdaRange')) && ~isempty(findCell(varargin, 'nRange')))
+                                            error('Specify both Weibull optimization ranges of lambda and n')
     % If the ranges are not directly specified but other fits are requested AND the deposit type is mass or volume
     elseif isempty(findCell(varargin, 'lambdaRange')) && length(fitType) > 1 && (strcmp(C.deposit, 'volume') || strcmp(C.deposit, 'mass'))
-                                            V.fitProps.WBL_lambdaRange  = varargin{findCell(varargin, 'lambdaRange')+1}; 
-                                            V.fitProps.WBL_nRange       = varargin{findCell(varargin, 'nRange')+1}; 
                                             warning('No initial ranges of lambda/n specified for the Weibull optimization. Using the average volume of all other fits to estimate initial ranges.\n In case deposit was set to ''mass'', conversion to volume using a density of 1000 kg/m3');
     else;                                   error('Initial ranges of lambda and n must be specified for the Weibull optimization with the arguments ''lambdaRange'' and ''nRange'' as a 1x2 vector containing [min, max]');
     end
@@ -290,21 +367,18 @@ cmap = [0.3639    0.5755    0.7484
         1.0000    0.5984    0.2000
         0.6769    0.4447    0.7114];
 
-% yscale
+% yScale
 ydata = cell(length(fitType),2);
 for iF = 1:length(fitType)
-    if strcmp(C.yscale, 'ln')
+    if strcmp(C.yScale, 'ln')
         ydata{iF,1} = log(V.yData);
         ydata{iF,2} = log(V.(fitType{iF}).Y);
-        yl          = 'Ln ';
-    elseif strcmp(C.yscale, 'log10')
+    elseif strcmp(C.yScale, 'log10')
         ydata{iF,1} = log10(V.yData);
         ydata{iF,2} = log10(V.(fitType{iF}).Y);
-        yl    = 'Log_1_0 ';
     else
         ydata{iF,1} = V.yData;
         ydata{iF,2} = V.(fitType{iF}).Y;
-        yl    = '';
     end
 end
 
@@ -313,8 +387,8 @@ end
 % Setup figure
 f = figure;
 if strcmpi(C.deposit, 'volume') || strcmpi(C.deposit, 'mass')
-    ax = cell(2,3);
-    for i = 1:6; ax{i} = subplot(2,3,i, 'Box', 'on'); hold on; end
+    ax = cell(2,2);
+    for i = 1:4; ax{i} = subplot(2,2,i, 'Box', 'on'); hold on; end
 else
     ax = cell(2,1);
     for i = 1:2; ax{i} = subplot(2,1,i, 'Box', 'on'); hold on; end
@@ -322,19 +396,19 @@ end
 
 % Plot data
 if strcmpi(C.deposit, 'volume') || strcmpi(C.deposit, 'mass')
-    plot_fit(ax{1},V,C,fitType(C.fit2plot),ydata,cmap)
-    plot_inVSout(ax{2}, V,C,fitType(C.fit2plot),cmap)
-    plot_volume(ax{4}, V,C,fitType(C.fit2plot),cmap)
-    plot_VEI(ax{5}, V,C,fitType(C.fit2plot),cmap)
+    plot_fit(ax{1}, V,C,fitType(C.fit2plot),ydata(C.fit2plot',:), cmap(C.fit2plot',:))
+    plot_inVSout(ax{2}, V,C,fitType(C.fit2plot),cmap(C.fit2plot',:))
+    plot_volume(ax{3}, V,C,fitType(C.fit2plot),cmap(C.fit2plot',:))
+    plot_VEI(ax{4}, V,C,fitType(C.fit2plot),cmap(C.fit2plot',:))
 else
-    plot_fit(ax{1},V,C,fitType(C.fit2plot),ydata,cmap)
-    plot_inVSout(ax{2}, V,C,fitType(C.fit2plot),cmap)
+    plot_fit(ax{1},V,C,fitType(C.fit2plot),ydata(C.fit2plot',:),cmap(C.fit2plot',:))
+    plot_inVSout(ax{2}, V,C,fitType(C.fit2plot),cmap(C.fit2plot',:))
 end
 
 % If activated, extract subplot to separate figures
 if strcmp(C.plotType, 'separate')
     if strcmpi(C.deposit, 'volume') || strcmpi(C.deposit, 'mass')
-        iEnd = 6;
+        iEnd = 4;
     else
         iEnd = 2;
     end          
@@ -444,8 +518,8 @@ for iF = 1:length(fitType)
         end
         
         % Work on yScale
-        if      strcmp(C.yscale, 'ln');         yP = log(yP);
-        elseif  strcmp(C.yscale, 'log10');      yP = log10(yP);
+        if      strcmp(C.yScale, 'ln');         yP = log(yP);
+        elseif  strcmp(C.yScale, 'log10');      yP = log10(yP);
         end
         
         % Do some cleaning of the Weibull data
@@ -454,9 +528,6 @@ for iF = 1:length(fitType)
             yP  = yP(not(idx),:);
             xP  = xP(not(idx),:);
         end
-%         x = [xP(:,1)', fliplr(xP(:,2)')];
-%         y = [yP(:,1)', fliplr(yP(:,2)')];
-%         fill(x,y,cmap(iF,:),'facealpha',.25, 'edgealpha', 0);                 %#plot filled area
             plot(ax, xP(:,1), yP(:,1), ':', 'LineWidth',.5, 'Color', cmap(iF,:));
             plot(ax, xP(:,2), yP(:,2), ':', 'LineWidth',.5, 'Color', cmap(iF,:));
     end
@@ -476,8 +547,8 @@ ylabel(ax, yl);
 function [xl, yl] = getLabels(C,plotType)
 % Fits plots
 if strcmp(plotType, 'fits')
-    if      strcmp(C.yscale, 'ln');         yl = 'Ln ';
-    elseif  strcmp(C.yscale, 'log10');      yl = 'Log_1_0 ';
+    if      strcmp(C.yScale, 'ln');         yl = 'Ln ';
+    elseif  strcmp(C.yScale, 'log10');      yl = 'Log_1_0 ';
     else;                                   yl = '';
     end
     
@@ -698,13 +769,13 @@ function V = volEXP(T0, k)
 
 T0 = T0/10^5;
 
-%% 1 segment
+% 1 segment
 if size(T0,1) == 1
     % Equation (12) of Fierstein and Nathenson (1992) 
     V = 2*(T0)/k^2;       
 end    
 
-%% 2 segments
+% 2 segments
 if size(T0,1) == 2
     A = (log(T0(2))-log(T0(1)))/(k(1)-k(2));
     k = -k;
@@ -712,7 +783,7 @@ if size(T0,1) == 2
     V = 2*T0(1)/k(1)^2 + 2*T0(1)*((k(2)*A+1)/k(2)^2 - (k(1)*A+1)/k(1)^2)*exp(-k(1)*A);                % Equation 18 of Fierstein and Nathenson (1992)
 end
 
-%% 3 segments   
+% 3 segments   
 if size(T0,1) == 3
     A1 = (log(T0(2))-log(T0(1)))/(k(1)-k(2));
     A2 = (log(T0(3))-log(T0(2)))/(k(2)-k(3));
