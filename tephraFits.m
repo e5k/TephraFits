@@ -15,55 +15,55 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %       Exponential: 0 or 1 arguments
 %           - 'BIS': 
 %           - Fit thickness data with 1 exponential segment:
-%               vExp = tephraVolume(thickness, area, 'exponential', 'volume') 
+%               vExp = tephraVolume(thickness, area, 'exponential', 'isopach') 
 %
 %           - Fit thickness data with 2 exponential segments, where the
 %           break in slope is located between the 3rd and 4th points (in
 %           decreasing thickness):
-%               vExp = TEPHRAVOLUME(thickness, area, 'exponential', 'volume', 3) 
+%               vExp = TEPHRAVOLUME(thickness, area, 'exponential', 'isopach', 3) 
 %
 %           - Fit thickness data with 3 exponential segments, where the
 %           break in slope are located after the 3rd and 6th points (in
 %           decreasing thickness):
-%               vExp = tephraVolume(thickness, area, 'exponential', 'volume', [3,6])
+%               vExp = tephraVolume(thickness, area, 'exponential', 'isopach', [3,6])
 %
 %       Power-law: 2 arguments
-%           tephraVolume(thickness, area, 'powerlaw', 'volume', C, T0)
+%           tephraVolume(thickness, area, 'powerlaw', 'isopach', C, T0)
 %           	C:  Distal integration limit (km)
 %               T0: Intersection of the proximal exponential segment
 %           Examples:
 %           - Fit thickness data with a Power-Law up to 300 km and using 
 %           the T0 from a 1-exponential segment approach:
-%               vPL = tephraVolume(thickness, area, 'powerlaw', 'volume', 300, vExp.T0)
+%               vPL = tephraVolume(thickness, area, 'powerlaw', 'isopach', 300, vExp.T0)
 %
 %           - Fit thickness data with a Power-Law up to 100 km and using 
 %           the T0 from the proximal segment of a multiple exponential 
 %           segment approach:
-%               vPL = tephraVolume(thickness, area, 'powerlaw', 'volume', 100, vExp.T0(1))
+%               vPL = tephraVolume(thickness, area, 'powerlaw', 'isopach', 100, vExp.T0(1))
 %
 %       Weibull: 1 or 2 arguments
 %           Examples:
 %           - Fit thickness data with a Weibull function using the volume
 %           (km3) obtained with a power-law to constrain the optimization 
 %            ranges of the lambda and n parameters:
-%               vWBL = tephraVolume(thickness, area, 'weibull', 'volume', vPL.volume_km3)
+%               vWBL = tephraVolume(thickness, area, 'weibull', 'isopach', vPL.volume_km3)
 %
 %           - Fit thickness data with a Weibull function manually specifying
 %           the optimization ranges of the lambda and n parameters:
-%               vWBL = tephraVolume(thickness, area, 'weibull', 'volume', lambdaRange, [0.1, 1000], nRange, [0.1, 1000])
+%               vWBL = tephraVolume(thickness, area, 'weibull', 'isopach', lambdaRange, [0.1, 1000], nRange, [0.1, 1000])
 %
 %   Optional imput arguments passed as parameter pairs
 %       'deposit':      Defines the type of deposit to fit
-%                       - 'volume':     Calculates the tephra volume (km3) based on Ln(Thickness) vs. sqrt isopach area relationship (default)
+%                       - 'isopach':    Calculates the tephra volume (km3) based on Ln(Thickness) vs. sqrt isopach area relationship (default)
 %                                       xData: square-root of isopach area (km)
 %                                       yData: isopach thickness (cm)
-%                       - 'mass':       Calculates the tephra mass (kg) based on Ln(Mass accumulation) vs. sqrt isomass area relationship
+%                       - 'isomass':       Calculates the tephra mass (kg) based on Ln(Mass accumulation) vs. sqrt isomass area relationship
 %                                       xData: square-root of isomass area (km)
 %                                       yData: isomass accumulation (kg/m2)
-%                       - 'thinning':   Thinning profile based on Ln(Thickness) vs. distance relationship
+%                       - 'thickness':   Thinning profile based on Ln(Thickness) vs. distance relationship
 %                                       xData: distance from source (km)
 %                                       yData: thickness (cm)
-%                       - 'fining':     Fining profile based on Ln(diameter of maximum clast) vs. sqrt isoleth area relationship
+%                       - 'isopleth':     Fining profile based on Ln(diameter of maximum clast) vs. sqrt isoleth area relationship
 %                                       xData: square-root of isopleth area (km)
 %                                       yData: clast diameter (cm)
 %
@@ -165,14 +165,14 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %           distance    = [0.5, 0.6, 1, 1.5 1.6, 1.7, 1.9, 2.0, 2.1, 2.4,2.6, 1.3];     % Distance from source (km)
 %
 %           4.1 Thinning trend
-%               thinning = tephraFits(distance, thickness, {'exponential', 'powerlaw'}, 'deposit', 'thinning', 'C', 20)
+%               thinning = tephraFits(distance, thickness, {'exponential', 'powerlaw'}, 'deposit', 'thickness', 'C', 20)
 %
-%       4. FINNING TREND (ISOPLETH)
+%       4. FINING TREND (ISOPLETH)
 %           diameter    = [9,7,6,5];                                                    % Isopleth diameter (cm)
-%           area        = sqrt([0.5, 0.6, 1, 1.5 1.6, 1.7, 1.9, 2.0, 2.1, 2.4,2.6, 1.3]);    % Isopleth area (km)
+%           area        = sqrt([1.6, 5.8, 10.0, 26.5]);                                 % Isopleth area (km)
 %
-%           4.1 Thinning trend
-%               thinning = tephraFits(distance, thickness, {'exponential', 'powerlaw'}, 'deposit', 'thinning', 'C', 20)
+%           4.1 Fining trend
+%               fining  = tephraFits(area, diameter, {'exponential', 'powerlaw'}, 'deposit', 'isopleth', 'C', 20)
 
 
 addpath('Dependencies/')
@@ -190,7 +190,7 @@ end
 
 %% Check optional arguments
 % Set default values and defines C as the configuration structure
-C.deposit       = 'volume';
+C.deposit       = 'isopach';
 C.yScale        = 'ln';                             % Scale of the y axis
 C.nbRuns        = 0;                                % Number of runs of the Monte-Carlo simulation
 C.errorType     = 'normal';                         % Error envelop
@@ -205,8 +205,8 @@ C.plotType      = 'subplot';                        % Defines if plots are part 
 
 % Check deposit
 if ~isempty(findCell(varargin, 'deposit'))                                  
-    if isempty(findCell({'volume', 'mass', 'thinning', 'fining'}, lower(varargin{findCell(varargin, 'deposit')+1})))
-        error('deposit accepts ''volume'', ''mass'', ''thinning''or ''fining''');
+    if isempty(findCell({'isopach', 'isomass', 'thickness', 'isopleth'}, lower(varargin{findCell(varargin, 'deposit')+1})))
+        error('deposit accepts ''isopach'', ''isomass'', ''thickness''or ''isopleth''');
     end
     C.deposit = varargin{findCell(varargin, 'deposit')+1};
 end
@@ -309,8 +309,11 @@ if ~isempty(findCell(fitType, 'exponential'))
 end    
 if ~isempty(findCell(fitType, 'powerlaw'))
     % Check if distal integration limit is specified
-    if isempty(findCell(varargin, 'C'));    error('The power-law method requires to provide the distal integration limit (i.e. argument C)')
-    else;                                   V.fitProps.PL_C = varargin{findCell(varargin, 'C')+1}; end
+    if isempty(findCell(varargin, 'C')) && ~strcmpi(C.deposit, 'isopleth')    
+                                            error('The power-law method requires to provide the distal integration limit (i.e. argument C)')
+    elseif ~strcmpi(C.deposit, 'isopleth');   V.fitProps.PL_C = varargin{findCell(varargin, 'C')+1}; 
+    else;                                   V.fitProps.PL_C = 100;  % In case deposit is 'isopleth', set an arbitrary distal integration limit
+    end
     
     % Check if distal integration limit is specified -> double check if the T0 should be specified in ln !!!!!!!
     if isempty(findCell(fitType, 'exponential')) && isempty(findCell(varargin, 'T0'))
@@ -319,7 +322,7 @@ if ~isempty(findCell(fitType, 'powerlaw'))
                                             V.fitProps.PL_T0 = varargin{findCell(varargin, 'T0')+1};
     end
 end    
-if strcmpi(fitType, 'weibull')
+if ~isempty(findCell(fitType, 'weibull'))
     % Check if ranges of lambda and n are specified    
     if ~isempty(findCell(varargin, 'lambdaRange')) && ~isempty(findCell(varargin, 'nRange'))
                                             V.fitProps.WBL_lambdaRange  = varargin{findCell(varargin, 'lambdaRange')+1}; 
@@ -327,8 +330,10 @@ if strcmpi(fitType, 'weibull')
     elseif (~isempty(findCell(varargin, 'lambdaRange')) && isempty(findCell(varargin, 'nRange'))) || (isempty(findCell(varargin, 'lambdaRange')) && ~isempty(findCell(varargin, 'nRange')))
                                             error('Specify both Weibull optimization ranges of lambda and n')
     % If the ranges are not directly specified but other fits are requested AND the deposit type is mass or volume
-    elseif isempty(findCell(varargin, 'lambdaRange')) && length(fitType) > 1 && (strcmp(C.deposit, 'volume') || strcmp(C.deposit, 'mass'))
-                                            warning('No initial ranges of lambda/n specified for the Weibull optimization. Using the average volume of all other fits to estimate initial ranges.\n In case deposit was set to ''mass'', conversion to volume using a density of 1000 kg/m3');
+    elseif isempty(findCell(varargin, 'lambdaRange')) && length(fitType) > 1 && (strcmp(C.deposit, 'isopach') || strcmp(C.deposit, 'isomass'))
+                                            warning('No initial ranges of lambda/n specified for the Weibull optimization. Using the average volume of all other fits to estimate initial ranges.\n In case deposit was set to ''isomass'', conversion to volume using a density of 1000 kg/m3');
+    elseif strcmpi(C.deposit, 'isopleth') && (isempty(findCell(varargin, 'lambdaRange')) || isempty(findCell(varargin, 'nRange')))
+                                            error('When deposit is set to ''isopleth'', both lambdaRange and nRange must be specified')
     else;                                   error('Initial ranges of lambda and n must be specified for the Weibull optimization with the arguments ''lambdaRange'' and ''nRange'' as a 1x2 vector containing [min, max]');
     end
 end
@@ -386,7 +391,7 @@ end
 
 % Setup figure
 f = figure;
-if strcmpi(C.deposit, 'volume') || strcmpi(C.deposit, 'mass')
+if strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass')
     ax = cell(2,2);
     for i = 1:4; ax{i} = subplot(2,2,i, 'Box', 'on'); hold on; end
 else
@@ -395,7 +400,7 @@ else
 end
 
 % Plot data
-if strcmpi(C.deposit, 'volume') || strcmpi(C.deposit, 'mass')
+if strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass')
     plot_fit(ax{1}, V,C,fitType(C.fit2plot),ydata(C.fit2plot',:), cmap(C.fit2plot',:))
     plot_inVSout(ax{2}, V,C,fitType(C.fit2plot),cmap(C.fit2plot',:))
     plot_volume(ax{3}, V,C,fitType(C.fit2plot),cmap(C.fit2plot',:))
@@ -407,7 +412,7 @@ end
 
 % If activated, extract subplot to separate figures
 if strcmp(C.plotType, 'separate')
-    if strcmpi(C.deposit, 'volume') || strcmpi(C.deposit, 'mass')
+    if strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass')
         iEnd = 4;
     else
         iEnd = 2;
@@ -468,7 +473,7 @@ lab            = cell(1, length(fitType)+2);
 lab(2:end-1)   = fitType;
 ax.XTickLabel  = lab;
 
-[~,yl]         = getLabels(C,'volume');
+[~,yl]         = getLabels(C,'isopach');
 ylabel(ax, yl);
 
 function plot_inVSout(ax,V,C,fitType,cmap)
@@ -523,7 +528,7 @@ for iF = 1:length(fitType)
         end
         
         % Do some cleaning of the Weibull data
-        if      strcmpi(fitType{iF}, 'weibull');
+        if      strcmpi(fitType{iF}, 'weibull')
             idx = sum(isinf(yP),2);  % Remove  infs
             yP  = yP(not(idx),:);
             xP  = xP(not(idx),:);
@@ -552,38 +557,38 @@ if strcmp(plotType, 'fits')
     else;                                   yl = '';
     end
     
-    if      strcmp(C.deposit,'volume');     yl = [yl, 'Thickness (cm)'];
+    if      strcmp(C.deposit,'isopach');    yl = [yl, 'Thickness (cm)'];
                                             xl = 'Isopach area^{0.5} (km)';
-    elseif  strcmp(C.deposit,'thinning');   yl = [yl, 'Thickness (cm)'];
+    elseif  strcmp(C.deposit,'thickness');  yl = [yl, 'Thickness (cm)'];
                                             xl = 'Distance from source (km)';
-    elseif  strcmp(C.deposit,'mass');       yl = [yl, 'Tephra accumulation (kg/m^2)'];
+    elseif  strcmp(C.deposit,'isomass');    yl = [yl, 'Tephra accumulation (kg/m^2)'];
                                             xl = 'Isomass area^{0.5} (km)';
-    elseif  strcmp(C.deposit,'fining');     yl = [yl, 'Diameter (cm)'];
+    elseif  strcmp(C.deposit,'isopleth');   yl = [yl, 'Diameter (cm)'];
                                             xl = 'Isopleth area^{0.5} (km)';
     end 
 end
 
 % In vs out plots
 if strcmp(plotType, 'InOut')
-    if  strcmp(C.deposit,'mass');           yl = 'Computed mass (kg)^{0.5}';
-                                            xl = 'Observed mass (kg)^{0.5}';
-    elseif  strcmp(C.deposit,'fining');     yl = 'Computed diameter (cm)^{0.5}';
-                                            xl = 'Observed diameter (cm)^{0.5}';
-    else;                                   yl = 'Computed thickness (cm)^{0.5}';
-                                            xl = 'Observed thickness (cm)^{0.5}';
+    if  strcmp(C.deposit,'isomass');        yl = 'Sqrt Computed mass (kg)';
+                                            xl = 'Sqrt Observed mass (kg)';
+    elseif  strcmp(C.deposit,'isopleth');   yl = 'Sqrt Computed diameter (cm)';
+                                            xl = 'Sqrt Observed diameter (cm)';
+    else;                                   yl = 'Sqrt Computed thickness (cm)';
+                                            xl = 'Sqrt Observed thickness (cm)';
     end 
 end
 
 % Volume plots
-if strcmp(plotType, 'volume')
-    if  strcmp(C.deposit,'mass');           yl = 'Mass (kg)'; xl = [];
+if strcmp(plotType, 'isopach')
+    if  strcmp(C.deposit,'isomass');        yl = 'Mass (kg)'; xl = [];
     else;                                   yl = 'Volume (km^3)'; xl = [];
     end 
 end
     
 % VEI plots
 if strcmp(plotType, 'VEI')
-    if  strcmp(C.deposit,'mass');           yl = 'Magnitude'; xl = [];
+    if  strcmp(C.deposit,'isomass');        yl = 'Magnitude'; xl = [];
     else;                                   yl = 'VEI'; xl = [];
     end 
 end
@@ -597,10 +602,10 @@ out.X               = Vtmp.X;
 out.Y               = Vtmp.Y;
 out.Ym              = Vtmp.Ym;
 % Deterministic 
-if strcmpi(C.deposit, 'volume')
+if strcmpi(C.deposit, 'isopach')
     out.volume_km3  = Vtmp.volume;
     out.VEI         = floor(log10(Vtmp.volume)+5);
-elseif strcmpi(C.deposit, 'mass')
+elseif strcmpi(C.deposit, 'isomass')
    out.mass_kg      = Vtmp.volume*1e11;
    out.magnitude    = log10(out.mass_kg)-7;
 end
@@ -608,7 +613,7 @@ if strcmpi(fitType, 'exponential')
     out.T0          = exp(Vtmp.F(:,1));
     out.k           = Vtmp.F(:,2);
     out.I           = Vtmp.I;
-    if strcmpi(C.deposit, 'fining')
+    if strcmpi(C.deposit, 'isopleth')
         % Half distance = log(2) / -k * sqrt(pi)
         out.bc      = -1*.391066419./out.k;
     else
@@ -633,11 +638,11 @@ if strcmpi(C.runMode, 'probabilistic')
     out.XP              = Vtmp.XP;
     out.YP              = Vtmp.YP;
     out.YmP             = Vtmp.YmP;
-    if strcmpi(C.deposit, 'volume')
+    if strcmpi(C.deposit, 'isopach')
         out.volume_range= [prctile(Vtmp.volumeP, C.errorBound(1)), prctile(Vtmp.volumeP, C.errorBound(2))];
         out.volumeP_km3 = Vtmp.volumeP;
         out.VEIP        = log10(Vtmp.volumeP)+5;
-    elseif strcmpi(deposit, 'mass')
+    elseif strcmpi(deposit, 'isomass')
         out.mass_range  = [prctile(Vtmp.volume*1e11, C.errorBound(1)), prctile(Vtmp.volume*1e11, C.errorBound(2))];
         out.massP_kg    = Vtmp.volumeP.*1e11;
         out.magnitudeP  = log10(out.massP_kg)-7;
@@ -648,7 +653,7 @@ if strcmpi(C.runMode, 'probabilistic')
         out.T0P         = exp(reshape(Vtmp.FP(:,1,:), size(Vtmp.FP,1),size(Vtmp.FP,3)));
         out.kP          = reshape(Vtmp.FP(:,2,:), size(Vtmp.FP,1),size(Vtmp.FP,3));
         out.IP          = reshape(Vtmp.IP, size(Vtmp.FP,1),size(Vtmp.FP,3));
-        if strcmpi(C.deposit, 'fining')
+        if strcmpi(C.deposit, 'isopleth')
             out.bcP     = -1*.391066419./out.k;
         else
             out.btP     = -1*.391066419./out.k;
@@ -672,7 +677,7 @@ R = struct;
 % Deterministic approach
 if strcmpi(fitType, 'exponential')
     [R.F,R.X,R.Y,R.r2,R.I,R.Ym] = fitEXP(V.xData, V.yData, V.fitProps.EXP_BIS, C);
-    R.(C.deposit)               = volEXP(exp(R.F(:,1)), R.F(:,2));
+    R.volume               = volEXP(exp(R.F(:,1)), R.F(:,2));
     
 elseif strcmpi(fitType, 'powerlaw')
     % Check T0
@@ -680,11 +685,11 @@ elseif strcmpi(fitType, 'powerlaw')
     else;                               T0 = V.exponential.T0(1);          % Here I take the T0 from the proximal segment
     end
     [R.F,R.X,R.Y,R.r2,R.Ym]     = fitPL(V.xData, V.yData, T0, C);    
-    R.(C.deposit)               = volPL(T0, -1*R.F(2), 10^R.F(1), V.fitProps.PL_C);
+    R.volume               = volPL(T0, -1*R.F(2), 10^R.F(1), V.fitProps.PL_C);
     
 elseif strcmpi(fitType, 'weibull')
     % If optimization ranges are not defined, use volume
-    if ~isfield(V.fitProps, 'WBL_lambdaRange')
+    if ~isfield(V.fitProps, 'WBL_lambdaRange') && ~strcmp(C.deposit, 'isopleth') 
         tmp = [];
         if isfield(V.('exponential'), 'volume_km3')
             tmp(length(tmp)+1) = V.exponential.volume_km3;
@@ -699,7 +704,7 @@ elseif strcmpi(fitType, 'weibull')
         [V.fitProps.WBL_lambdaRange, V.fitProps.WBL_nRange] = get_WBL_ranges(mean(tmp));
     end       
     [R.F,R.X,R.Y,R.r2,R.Ym]     = fitWBL(V.xData, V.yData, V.fitProps.WBL_lambdaRange, V.fitProps.WBL_nRange, C);
-    R.(C.deposit)               = volWBL(R.F(1), R.F(2), R.F(3));
+    R.volume               = volWBL(R.F(1), R.F(2), R.F(3));
 end
 
 % Probabilistic approach
@@ -712,20 +717,20 @@ if strcmp(C.runMode, 'probabilistic')
         if strcmpi(fitType, 'exponential')
             [R.FP(:,:,iR), R.XP(:,:,iR), R.YP(:,:,iR), R.r2P(:,:,iR), R.IP(:,:,iR), R.YmP(:,:,iR)] =...
                 fitEXP(V.xDataP(:,:,iR), V.yDataP(:,:,iR), V.fitProps.EXP_BIS, C);
-            R.([C.deposit,'P'])(iR) = volEXP(exp(R.FP(:,1,iR)), R.FP(:,2,iR));
-            
+            R.volumeP(iR) = volEXP(exp(R.FP(:,1,iR)), R.FP(:,2,iR));
+            %R.([C.deposit,'P'])(iR)
         elseif strcmpi(fitType, 'powerlaw')
             if isfield(V.fitProps, 'PL_T0');    T0 = ones(1,1,C.nbRuns).*V.fitProps.PL_T0;
             else;                               T0 = V.exponential.T0P(1,:);
             end     
             [R.FP(:,:,iR), R.XP(:,:,iR), R.YP(:,:,iR), R.r2P(:,:,iR), R.YmP(:,:,iR)]  =...
                 fitPL(V.xDataP(:,:,iR), V.yDataP(:,:,iR), T0(iR), C);
-            R.([C.deposit,'P'])(iR) = volPL(T0(iR), -1*R.FP(:,2,iR), 10^R.FP(:,1,iR), V.fitProps.PL_CP(iR));
+            R.volumeP(iR) = volPL(T0(iR), -1*R.FP(:,2,iR), 10^R.FP(:,1,iR), V.fitProps.PL_CP(iR));
             
         elseif strcmpi(fitType, 'weibull')
             [R.FP(:,:,iR), R.XP(:,:,iR), R.YP(:,:,iR), R.r2P(:,:,iR), R.YmP(:,:,iR)]  =...
                 fitWBL(V.xDataP(:,:,iR), V.yDataP(:,:,iR), V.fitProps.WBL_lambdaRange, V.fitProps.WBL_nRange, C);
-            R.([C.deposit,'P'])(iR) = volWBL(R.FP(:,1,iR), R.FP(:,2,iR), R.FP(:,3,iR));
+            R.volumeP(iR) = volWBL(R.FP(:,1,iR), R.FP(:,2,iR), R.FP(:,3,iR));
         end
     end
 end
@@ -748,8 +753,8 @@ elseif strcmpi(errorType, 'uniform')
     dataP = dataP + dataP .* ((-dataE+(dataE-(-dataE)) .* rand(size(dataE)))./100);
 end
 
-% Returns the percentile p of the vector X
 function yi = prctile(X,p)
+% Returns the percentile p of the vector X
 x=X(:);
 if length(x)~=length(X)
     error('please pass a vector only');
