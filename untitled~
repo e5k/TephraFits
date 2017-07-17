@@ -1,7 +1,0 @@
-path_list_cell = regexp(path,pathsep,'Split')
-
-if any(ismember('TephraFits',path_list_cell))
-    disp('Yes, this directory is in MATLAB path');
-else
-    disp('No, this directory is not in MATLAB path');
-end
