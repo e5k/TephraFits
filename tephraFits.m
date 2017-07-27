@@ -428,18 +428,20 @@ end
 
 function plot_VEI(ax,V,C,fitType,cmap)
 axes(ax);
-% if strcmpi(C.runMode, 'probabilistic')
-%     for iF = 1:length(fitType)
-%         bplot(V.(fitType{iF}).VEIP, iF, 'nomean', 'nolegend', 'outliers', 'whisker', C.errorBound(1), 'color', cmap(iF,:), 'linewidth',.5, 'width', .5);
-%     end
-% else
-%     for iF = 1:length(fitType)
-%         bar(ax, iF, V.(fitType{iF}).VEI, 'FaceColor', cmap(iF,:));
-%     end 
-%end
+
+% Check which field to plot (whether it is mass or volume)
+if strcmpi(C.deposit, 'isopach') && strcmpi(C.runMode, 'probabilistic')
+    toPlot = 'VEI';
+elseif strcmpi(C.deposit, 'isopach')   
+    toPlot = 'VEI';
+elseif strcmpi(C.deposit, 'isomass') && strcmpi(C.runMode, 'probabilistic')
+    toPlot = 'magnitude';
+elseif strcmpi(C.deposit, 'isomass')
+    toPlot = 'magnitude';
+end
 
 for iF = 1:length(fitType)
-    bar(ax, iF, V.(fitType{iF}).VEI, 'FaceColor', cmap(iF,:));
+    bar(ax, iF, V.(fitType{iF}).(toPlot), 'FaceColor', cmap(iF,:));
 end
 
 % Set labels
@@ -456,13 +458,25 @@ ylabel(ax, yl);
 
 function plot_volume(ax,V,C,fitType,cmap)
 axes(ax);
+
+% Check which field to plot (whether it is mass or volume)
+if strcmpi(C.deposit, 'isopach') && strcmpi(C.runMode, 'probabilistic')
+    toPlot = 'volumeP_km3';
+elseif strcmpi(C.deposit, 'isopach')   
+    toPlot = 'volume_km3';
+elseif strcmpi(C.deposit, 'isomass') && strcmpi(C.runMode, 'probabilistic')
+    toPlot = 'massP_kg';
+elseif strcmpi(C.deposit, 'isomass')
+    toPlot = 'mass_kg';
+end
+    
 if strcmpi(C.runMode, 'probabilistic')
     for iF = 1:length(fitType)
-        bplot(V.(fitType{iF}).volumeP_km3, iF, 'nomean', 'nolegend', 'outliers', 'whisker', C.errorBound(1), 'color', cmap(iF,:), 'linewidth',.5, 'width', .5);
+        bplot(V.(fitType{iF}).(toPlot), iF, 'nomean', 'nolegend', 'outliers', 'whisker', C.errorBound(1), 'color', cmap(iF,:), 'linewidth',.5, 'width', .5);
     end
 else
     for iF = 1:length(fitType)
-        bar(ax, iF, V.(fitType{iF}).volume_km3, 'FaceColor', cmap(iF,:));
+        bar(ax, iF, V.(fitType{iF}).(toPlot), 'FaceColor', cmap(iF,:));
     end 
 end
 
