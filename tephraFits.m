@@ -299,6 +299,8 @@ if ~isempty(findCell(fitType, 'exponential'))
     % Check if break-in-slope is specified
     if isempty(findCell(varargin, 'BIS'));  V.fitProps.EXP_BIS = [];
                                             warning('No break-in-slope index specified, using one exponential segment. Use ''BIS'' argument to specify the break-in-slope indices.')
+    elseif length(varargin{findCell(varargin, 'BIS')+1}) > 2
+                                            error('Specify up to 3 segments');
     else                                   
         V.fitProps.EXP_BIS = varargin{findCell(varargin, 'BIS')+1}; 
         % Check if more than one instance of the exponential fit is called
@@ -865,11 +867,11 @@ if isempty(Aip)
     r2(1)= rsquare(exp(ydata), exp(F(i,1)).*exp(F(i,2).*xdata)); 
 % Multiple segments
 else
-    % Find intersection of 2 segments
+    % Find intersection of segments
     for i = 1:length(idx)-1
         % First segment
-        if i == 1                       
-            I(i)    = polyxpoly(Xt, exp(F(i,1)).*exp(F(i,2).*Xt), Xt, exp(F(i+1,1)).*exp(F(i+1,2).*Xt));
+        if i == 1       
+            I(i)    = (F(i+1,1)-F(i,1))/(F(i,2)-F(i+1,2));
             X{i}    = [0,I(i)];
             idxS = idx(i);
         end       
@@ -880,7 +882,7 @@ else
         end        
         % Middle segments
         if i > 1 && i < length(idx)-1   
-            I(i)    = polyxpoly(Xt, exp(F(i,1)).*exp(F(i,2).*Xt), Xt, exp(F(i+1,1)).*exp(F(i+1,2).*Xt));
+            I(i)    = (F(i+1,1)-F(i,1))/(F(i,2)-F(i+1,2));
             X{i}    = [X{i-1}(end), I(i)];
             idxS = idx(i)+1;
         end
