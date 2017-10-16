@@ -81,6 +81,7 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %
 %       'plotType':     - 'subplot':    Plots are inside a subplot (default)
 %                       - 'separate':   Individual plots
+%                       - 'none':       Does not produce any plot
 %
 %       'runMode':      - 'single':     Single volume fit (default)
 %                       - 'probabilistic': Monte Carlo simulations following the method of Biass et al. (2014). If  activated, the following arguments are required
@@ -153,7 +154,7 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %
 %           3.3 Adding an error of 20% on the distal integration limit of the power-law
 %               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw'}, 'C', 20, 'CError', 20, 'runMode', 'probabilistic', 'nbRuns', 100, 'xError', 10, 'yError', 20  )
-%
+% 
 %           3.4 Use a uniform distribution of errors instead of a Gaussian
 %               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw'}, 'C', 20, 'CError', 20, 'runMode', 'probabilistic', 'nbRuns', 100, 'xError', 10, 'yError', 20, 'errorType', 'uniform' )
 %
@@ -167,11 +168,11 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %           4.1 Thinning trend
 %               thinning = tephraFits(distance, thickness, {'exponential', 'powerlaw'}, 'deposit', 'thickness', 'C', 20)
 %
-%       4. FINING TREND (ISOPLETH)
+%       5. FINING TREND (ISOPLETH)
 %           diameter    = [9,7,6,5];                                                    % Isopleth diameter (cm)
 %           area        = sqrt([1.6, 5.8, 10.0, 26.5]);                                 % Isopleth area (km)
 %
-%           4.1 Fining trend
+%           5.1 Fining trend
 %               fining  = tephraFits(area, diameter, {'exponential', 'powerlaw'}, 'deposit', 'isopleth', 'C', 20)
 
 
@@ -191,17 +192,7 @@ end
 %% Check optional arguments
 % Set default values and defines C as the configuration structure
 C.deposit       = 'isopach';
-C.yScale        = 'ln';                             % Scale of the y axis
-C.nbRuns        = 0;                                % Number of runs of the Monte-Carlo simulation
-C.errorType     = 'normal';                         % Error envelop
-C.errorBound    = [5,95];                           % Percentiles used for volume estimate
-C.xError        = ones(size(xData)).*10;            % Error on xData
-C.yError        = ones(size(yData)).*10;            % Error on yData
-C.CError        = 10;                               % Error on the distal integration limit
-C.runMode       = 'single';                         % Single/probabilistic mode        
-C.maxDist       = 1;                                % Defines the maximum extent of extrapolation in distal part. 1 means 100%, i.e. the distance to the most distal point is doubled
-C.fit2plot      = true(size(fitType));              % Defines which distributions to plot    
-C.plotType      = 'subplot';                        % Defines if plots are part of a subplot or separate figures
+C.runMode       = 'single';
 
 % Check deposit
 if ~isempty(findCell(varargin, 'deposit'))                                  
@@ -216,6 +207,8 @@ if ~isempty(findCell(varargin, 'yScale'))
         error('yScale accepts ''ln'', ''log10'' or ''linear''');
     end
     C.yScale = varargin{findCell(varargin, 'yScale')+1};
+else
+    C.yScale        = 'ln';
 end
 % Check runMode
 if ~isempty(findCell(varargin, 'runMode'))                               
@@ -223,19 +216,29 @@ if ~isempty(findCell(varargin, 'runMode'))
         error('runMode accepts ''single'' or ''probabilistic''');
     end
     C.runMode = varargin{findCell(varargin, 'runMode')+1};
+else
+    C.runMode = 'single';                         % Single/probabilistic mode        
 end
 % Check maxDist
 if ~isempty(findCell(varargin, 'maxDistance'))                               
     C.maxDist = varargin{findCell(varargin, 'maxDistance')+1};  
+else
+    C.maxDist = 1;                                % Defines the maximum extent of extrapolation in distal part. 1 means 100%, i.e. the distance to the most distal point is doubled
+    warning('No maximum interpolation was specified, using 100% of the distance to the most distal value')
 end
 % Check Fits to plot
 if ~isempty(findCell(varargin, 'fit2plot'))         
     %C.fit2plot    = logical(varargin{findCell(varargin, 'fit2plot')+1}); 
     C.fit2plot    = logical(varargin{findCell(varargin, 'fit2plot')+1}); 
+else
+    C.fit2plot    = true(size(fitType));              % Defines which distributions to plot    
+
 end
 % Check plot type
 if ~isempty(findCell(varargin, 'plotType'))         
     C.plotType    = varargin{findCell(varargin, 'plotType')+1};  
+else
+    C.plotType    = 'subplot';                        % Defines if plots are part of a subplot or separate figure
 end
 
 % In case the probabilistic mode is activated, extra checks
@@ -246,6 +249,9 @@ if strcmp(C.runMode, 'probabilistic')
             error('errorType accepts ''uniform'' or ''normal''');
         end
         C.errorType = varargin{findCell(varargin, 'errorType')+1};
+    else
+        C.errorType     = 'normal';                         % Error envelop
+        warning('No error envelop was specified, using a normal distribution');
     end
     
     % Check xError and yError
@@ -283,6 +289,9 @@ if strcmp(C.runMode, 'probabilistic')
             error('errorBound should be specified as a symetrical 1x2 vector')
         else;    C.errorBound = varargin{findCell(varargin, 'errorBound')+1};
         end
+    else
+        C.errorBound = [5,95];
+        warning('No error bounds were specified, using the 5th and 95th percentiles');
     end
 end
 
@@ -346,6 +355,12 @@ tmp         = [reshape(xData, length(xData), 1), reshape(yData, length(yData), 1
 V.xData     = tmp(:,1);
 V.yData     = tmp(:,2);
 
+% Storage
+warn_msg    = struct;               % Stores warning messages
+warn_idx    = 1;                    % Index for warning messages
+warn_str    = warning('off','all'); % turn all warnings off
+
+%% Run
 % If probabilstic mode
 if strcmp(C.runMode, 'probabilistic')
     tmp      = [reshape(C.xError, length(C.xError), 1), reshape(C.yError, length(C.yError), 1)];
@@ -392,40 +407,42 @@ end
 % Deposit type
 
 % Setup figure
-f = figure;
-if strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass')
-    ax = cell(2,2);
-    for i = 1:4; ax{i} = subplot(2,2,i, 'Box', 'on'); hold on; end
-else
-    ax = cell(2,1);
-    for i = 1:2; ax{i} = subplot(2,1,i, 'Box', 'on'); hold on; end
-end
-
-% Plot data
-if strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass')
-    plot_fit(ax{1}, V,C,fitType(C.fit2plot),ydata(C.fit2plot',:), cmap(C.fit2plot',:))
-    plot_inVSout(ax{2}, V,C,fitType(C.fit2plot),cmap(C.fit2plot',:))
-    plot_volume(ax{3}, V,C,fitType(C.fit2plot),cmap(C.fit2plot',:))
-    plot_VEI(ax{4}, V,C,fitType(C.fit2plot),cmap(C.fit2plot',:))
-else
-    plot_fit(ax{1},V,C,fitType(C.fit2plot),ydata(C.fit2plot',:),cmap(C.fit2plot',:))
-    plot_inVSout(ax{2}, V,C,fitType(C.fit2plot),cmap(C.fit2plot',:))
-end
-
-% If activated, extract subplot to separate figures
-if strcmp(C.plotType, 'separate')
+if ~strcmp(C.plotType, 'none')
+    f = figure;
     if strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass')
-        iEnd = 4;
+        ax = cell(2,2);
+        for i = 1:4; ax{i} = subplot(2,2,i, 'Box', 'on'); hold on; end
     else
-        iEnd = 2;
-    end          
-    f2 = zeros(1,iEnd);
-    for i = 1:iEnd
-        f2(i)   = figure;
-        ah      = copyobj([ax{i}, legend(ax{i})],f2(i));
-        set(ah(1), 'Position',[.1,.1,.8,.8]);
+        ax = cell(2,1);
+        for i = 1:2; ax{i} = subplot(2,1,i, 'Box', 'on'); hold on; end
     end
-    delete(f)
+
+    % Plot data
+    if strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass')
+        plot_fit(ax{1}, V,C,fitType(C.fit2plot),ydata(C.fit2plot',:), cmap(C.fit2plot',:))
+        plot_inVSout(ax{2}, V,C,fitType(C.fit2plot),cmap(C.fit2plot',:))
+        plot_volume(ax{3}, V,C,fitType(C.fit2plot),cmap(C.fit2plot',:))
+        plot_VEI(ax{4}, V,C,fitType(C.fit2plot),cmap(C.fit2plot',:))
+    else
+        plot_fit(ax{1},V,C,fitType(C.fit2plot),ydata(C.fit2plot',:),cmap(C.fit2plot',:))
+        plot_inVSout(ax{2}, V,C,fitType(C.fit2plot),cmap(C.fit2plot',:))
+    end
+
+    % If activated, extract subplot to separate figures
+    if strcmp(C.plotType, 'separate')
+        if strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass')
+            iEnd = 4;
+        else
+            iEnd = 2;
+        end          
+        f2 = zeros(1,iEnd);
+        for i = 1:iEnd
+            f2(i)   = figure;
+            ah      = copyobj([ax{i}, legend(ax{i})],f2(i));
+            set(ah(1), 'Position',[.1,.1,.8,.8]);
+        end
+        delete(f)
+    end
 end
 
 function plot_VEI(ax,V,C,fitType,cmap)
@@ -638,6 +655,10 @@ if strcmpi(fitType, 'exponential')
 elseif strcmpi(fitType, 'powerlaw')
     out.m           = -1*Vtmp.F(2);
     out.TPl         = 10^Vtmp.F(1);
+    % Display a warning if m<2
+    if out.m < 2
+        warning('The power law exponent is < 2, which means that the volume is highly sensitive to the distal integration limit.');
+    end
 elseif strcmpi(fitType, 'weibull')
     out.theta       = Vtmp.F(1);
     out.lambda      = Vtmp.F(2);
