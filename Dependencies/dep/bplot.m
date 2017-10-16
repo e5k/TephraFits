@@ -1,4 +1,5 @@
 % function forLegend = bplot(X,varargin)
+% This function will create a nice boxplot from a set of data. You don't
 % need any toolboxes.
 % 
 %     bplot(D) will create a boxplot of data D, no fuss.
@@ -31,7 +32,7 @@
 %                        not pass it a position and only if the number of
 %                        points are less than 400.
 %                        'nopoints','nodots'
-%                 'std': Set the whiskers to be the meanÂ±standard deviation
+%                 'std': Set the whiskers to be the mean±standard deviation
 %                        The legend information will be updated
 %                        'standard'
 %              'nomean': Don't plot the mean 'plus' symbol '+'
@@ -348,7 +349,7 @@ if justOneInputFlag
 end
 %% Set the legend
 if stdFlag
-    whiskerText = '\mu Â± \sigma';
+    whiskerText = '\mu ± \sigma';
 else
     whiskerText = [num2str(percentileNum2) '%-' num2str(100-percentileNum2) '%'];
 end
