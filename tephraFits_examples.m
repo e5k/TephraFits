@@ -4,7 +4,7 @@ clear
 isopach_thick   = [90, 40, 20, 10, 8, 5, 4, 3];
 isopach_area    = [0.4829, 1.4988, 2.6885, 6.2340, 9.7683, 16.2802, 26.1925, 36.3183];
 %tephraFits(sqrt(isopach_area),isopach_thick,{'exponential', 'powerlaw', 'weibull'}, 'C', 20, 'CError', 20, 'deposit', 'volume', 'BIS', 3, 'runMode', 'probabilistic', 'nbRuns', 10, 'xError', ones(size(isopach_thick)).*10, 'yError', ones(size(isopach_thick)).*10)
-tephraFits(sqrt(isopach_area),isopach_thick,{'exponential', 'powerlaw', 'weibull'}, 'C', 20, 'CError', 20, 'deposit', 'volume', 'BIS', 3)
+tephraFits(sqrt(isopach_area),isopach_thick,{'exponential', 'powerlaw', 'weibull'}, 'C', 20, 'CError', 20, 'deposit', 'isopach', 'BIS', 3)
 
 % Thinning
 lobe_thickness  = [12.5000   96.0000   40.0000   16.0000   14.0000   16.0000    6.0000   13.0000    7.0000   12.0000   10.0000   26.0000];

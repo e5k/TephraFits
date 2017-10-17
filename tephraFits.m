@@ -1,6 +1,6 @@
 function [V,C] = tephraFits(xData, yData, fitType, varargin)
-%% TEPHRAVOLUME Calculate the volume/mass of tephra deposits
-%   V = tephraVolume(xdata, ydata, method, deposit, ...) returns a structure
+%% TEPHRAFITS Calculate the volume/mass of tephra deposits
+%   V = tephraFits(xdata, ydata, method, deposit, ...) returns a structure
 %   containing the volume [km3] (or mass [kg]), fit details and VEI.
 %
 %   Required input arguments:
@@ -15,42 +15,42 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %       Exponential: 0 or 1 arguments
 %           - 'BIS': 
 %           - Fit thickness data with 1 exponential segment:
-%               vExp = tephraVolume(thickness, area, 'exponential', 'isopach') 
+%               vExp = tephraFits(thickness, area, 'exponential', 'isopach') 
 %
 %           - Fit thickness data with 2 exponential segments, where the
 %           break in slope is located between the 3rd and 4th points (in
 %           decreasing thickness):
-%               vExp = TEPHRAVOLUME(thickness, area, 'exponential', 'isopach', 3) 
+%               vExp = TEPHRAFITS(thickness, area, 'exponential', 'isopach', 3) 
 %
 %           - Fit thickness data with 3 exponential segments, where the
 %           break in slope are located after the 3rd and 6th points (in
 %           decreasing thickness):
-%               vExp = tephraVolume(thickness, area, 'exponential', 'isopach', [3,6])
+%               vExp = tephraFits(thickness, area, 'exponential', 'isopach', [3,6])
 %
 %       Power-law: 2 arguments
-%           tephraVolume(thickness, area, 'powerlaw', 'isopach', C, T0)
+%           tephraFits(thickness, area, 'powerlaw', 'isopach', C, T0)
 %           	C:  Distal integration limit (km)
 %               T0: Intersection of the proximal exponential segment
 %           Examples:
 %           - Fit thickness data with a Power-Law up to 300 km and using 
 %           the T0 from a 1-exponential segment approach:
-%               vPL = tephraVolume(thickness, area, 'powerlaw', 'isopach', 300, vExp.T0)
+%               vPL = tephraFits(thickness, area, 'powerlaw', 'isopach', 300, vExp.T0)
 %
 %           - Fit thickness data with a Power-Law up to 100 km and using 
 %           the T0 from the proximal segment of a multiple exponential 
 %           segment approach:
-%               vPL = tephraVolume(thickness, area, 'powerlaw', 'isopach', 100, vExp.T0(1))
+%               vPL = tephraFits(thickness, area, 'powerlaw', 'isopach', 100, vExp.T0(1))
 %
 %       Weibull: 1 or 2 arguments
 %           Examples:
 %           - Fit thickness data with a Weibull function using the volume
 %           (km3) obtained with a power-law to constrain the optimization 
 %            ranges of the lambda and n parameters:
-%               vWBL = tephraVolume(thickness, area, 'weibull', 'isopach', vPL.volume_km3)
+%               vWBL = tephraFits(thickness, area, 'weibull', 'isopach', vPL.volume_km3)
 %
 %           - Fit thickness data with a Weibull function manually specifying
 %           the optimization ranges of the lambda and n parameters:
-%               vWBL = tephraVolume(thickness, area, 'weibull', 'isopach', lambdaRange, [0.1, 1000], nRange, [0.1, 1000])
+%               vWBL = tephraFits(thickness, area, 'weibull', 'isopach', lambdaRange, [0.1, 1000], nRange, [0.1, 1000])
 %
 %   Optional imput arguments passed as parameter pairs
 %       'deposit':      Defines the type of deposit to fit
@@ -175,8 +175,8 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %           5.1 Fining trend
 %               fining  = tephraFits(area, diameter, {'exponential', 'powerlaw'}, 'deposit', 'isopleth', 'C', 20)
 
-
-addpath('Dependencies/')
+warning off backtrace % turn all warnings off
+addpath(genpath('Dependencies/'))
 % Define the main storage structures
 C = struct;     % Configuration structure
 V = struct;     % Volume structure
@@ -208,7 +208,7 @@ if ~isempty(findCell(varargin, 'yScale'))
     end
     C.yScale = varargin{findCell(varargin, 'yScale')+1};
 else
-    C.yScale        = 'ln';
+    C.yScale = 'ln';
 end
 % Check runMode
 if ~isempty(findCell(varargin, 'runMode'))                               
@@ -355,11 +355,6 @@ tmp         = [reshape(xData, length(xData), 1), reshape(yData, length(yData), 1
 V.xData     = tmp(:,1);
 V.yData     = tmp(:,2);
 
-% Storage
-warn_msg    = struct;               % Stores warning messages
-warn_idx    = 1;                    % Index for warning messages
-warn_str    = warning('off','all'); % turn all warnings off
-
 %% Run
 % If probabilstic mode
 if strcmp(C.runMode, 'probabilistic')
@@ -444,6 +439,7 @@ if ~strcmp(C.plotType, 'none')
         delete(f)
     end
 end
+warning on backtrace % turn all warnings on
 
 function plot_VEI(ax,V,C,fitType,cmap)
 axes(ax);
