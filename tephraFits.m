@@ -72,7 +72,7 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %                       - 'log10':      Log base 10
 %                       - 'linear':     Linear
 %
-%       'maxDistancee': Defines the maximum extent of extrapolation in distal part for plotting. 1 means 100%, i.e. the distance to the most distal point is doubled
+%       'maxDistance':  Defines the maximum extent of extrapolation in distal part for plotting. 1 means 100%, i.e. the distance to the most distal point is doubled
 %                       Default = 1
 %
 %       'fits2plot':    Defines which fits to plot. If passed, it should be passed as a 1xlength(fitTypes) boolean vector
@@ -663,6 +663,15 @@ elseif strcmpi(fitType, 'weibull')
     if nnz(round(V.fitProps.WBL_lambdaRange,3) == round(out.lambda,3)) > 0 || nnz(round(V.fitProps.WBL_nRange,3) == round(out.n,3)) > 0
         warning('The Weibull parameters obtained by the optimization algorithm converge to initial bounds. You might want to expand them.')
     end
+    
+    % If isopleth, calculate the plume height
+    if strcmpi(C.deposit, 'isopleth')
+        out.Ht      = 5.01 * out.lambda^.55;    % Equation 7 of Bonadonna and Costa (2013)
+        % If the calculated plume height is outside of the range of plume heights used for the empirical fit
+        if out.Ht < 7 || out.Ht > 50
+            warning('The plume height calculated from the Weibull parameter lambda_ML is outside of the range of plume heights used to define the empirical fit')
+        end
+    end
 end
 out.r2              = Vtmp.r2;
 
@@ -698,6 +707,10 @@ if strcmpi(C.runMode, 'probabilistic')
         out.thetaP      = reshape(Vtmp.FP(:,1,:), size(Vtmp.FP,1),size(Vtmp.FP,3));
         out.lambdaP     = reshape(Vtmp.FP(:,2,:), size(Vtmp.FP,1),size(Vtmp.FP,3));
         out.nP          = reshape(Vtmp.FP(:,3,:), size(Vtmp.FP,1),size(Vtmp.FP,3));
+        % If isopleth, calculate the plume height
+        if strcmpi(C.deposit, 'isopleth')
+            out.HtP     = 5.01 .* out.lambdaP.^.55;    % Equation 7 of Bonadonna and Costa (2013)
+        end
     end
     out.r2P             = reshape(Vtmp.r2P, size(Vtmp.FP,1),size(Vtmp.FP,3));
 end
@@ -991,7 +1004,8 @@ function [lam_r, n_r] = get_WBL_ranges(vol)
 % In case the user did not specify it, this function returns typical ranges 
 % of lambda and n values considering a VEI based on the mean of the volume 
 % values obtained with the methods of Fierstein and Nathenson (1992) 
-% and Bonadonna and Houghton (2005) to estimate the VEI.
+% and Bonadonna and Houghton (2005) to estimate the VEI (see Table 2 of
+% Bonadonna and Costa, 2013)
 % vol:  Volume (km3)
 
 if vol >= 10
