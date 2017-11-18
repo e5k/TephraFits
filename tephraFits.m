@@ -60,7 +60,7 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %                       - 'isomass':       Calculates the tephra mass (kg) based on Ln(Mass accumulation) vs. sqrt isomass area relationship
 %                                       xData: square-root of isomass area (km)
 %                                       yData: isomass accumulation (kg/m2)
-%                       - 'thickness':   Thinning profile based on Ln(Thickness) vs. distance relationship
+%                       - 'transect':  Thinning profile based on Ln(Thickness) vs. distance relationship
 %                                       xData: distance from source (km)
 %                                       yData: thickness (cm)
 %                       - 'isopleth':     Fining profile based on Ln(diameter of maximum clast) vs. sqrt isoleth area relationship
@@ -166,7 +166,7 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %           distance    = [0.5, 0.6, 1, 1.5 1.6, 1.7, 1.9, 2.0, 2.1, 2.4,2.6, 1.3];     % Distance from source (km)
 %
 %           4.1 Thinning trend
-%               thinning = tephraFits(distance, thickness, {'exponential', 'powerlaw'}, 'deposit', 'thickness', 'C', 20)
+%               thinning = tephraFits(distance, thickness, {'exponential', 'powerlaw'}, 'deposit', 'transect', 'C', 20)
 %
 %       5. FINING TREND (ISOPLETH)
 %           diameter    = [9,7,6,5];                                                    % Isopleth diameter (cm)
@@ -196,8 +196,8 @@ C.runMode       = 'single';
 
 % Check deposit
 if ~isempty(findCell(varargin, 'deposit'))                                  
-    if isempty(findCell({'isopach', 'isomass', 'thickness', 'isopleth'}, lower(varargin{findCell(varargin, 'deposit')+1})))
-        error('deposit accepts ''isopach'', ''isomass'', ''thickness''or ''isopleth''');
+    if isempty(findCell({'isopach', 'isomass', 'transect', 'isopleth'}, lower(varargin{findCell(varargin, 'deposit')+1})))
+        error('deposit accepts ''isopach'', ''isomass'', ''transect''or ''isopleth''');
     end
     C.deposit = varargin{findCell(varargin, 'deposit')+1};
 end
@@ -368,7 +368,7 @@ if strcmp(C.runMode, 'probabilistic')
     end
 end
 
-%% Run
+% Single run
 for iF = 1:length(fitType)
     [Vtmp,V]        = fitMe(V,C,fitType{iF});
     V.(fitType{iF}) = prepareOutput(Vtmp, V,C,fitType{iF});
@@ -439,188 +439,9 @@ if ~strcmp(C.plotType, 'none')
         delete(f)
     end
 end
+
+writeOutput(V,C,fitType);
 warning on backtrace % turn all warnings on
-
-function plot_VEI(ax,V,C,fitType,cmap)
-axes(ax);
-
-% Check which field to plot (whether it is mass or volume)
-if strcmpi(C.deposit, 'isopach') && strcmpi(C.runMode, 'probabilistic')
-    toPlot = 'VEI';
-elseif strcmpi(C.deposit, 'isopach')   
-    toPlot = 'VEI';
-elseif strcmpi(C.deposit, 'isomass') && strcmpi(C.runMode, 'probabilistic')
-    toPlot = 'magnitude';
-elseif strcmpi(C.deposit, 'isomass')
-    toPlot = 'magnitude';
-end
-
-for iF = 1:length(fitType)
-    bar(ax, iF, V.(fitType{iF}).(toPlot), 'FaceColor', cmap(iF,:));
-end
-
-% Set labels
-xlim([0,length(fitType)+1]);
-ax.XTick       = 0:length(fitType)+2;
-lab            = cell(1, length(fitType)+2);
-lab(2:end-1)   = fitType;
-ax.XTickLabel  = lab;
-ax.YTick       = 0:7;
-ax.YGrid       = 'on';
-ylim([0,7]);
-[~,yl]         = getLabels(C,'VEI');
-ylabel(ax, yl);
-
-function plot_volume(ax,V,C,fitType,cmap)
-axes(ax);
-
-% Check which field to plot (whether it is mass or volume)
-if strcmpi(C.deposit, 'isopach') && strcmpi(C.runMode, 'probabilistic')
-    toPlot = 'volumeP_km3';
-elseif strcmpi(C.deposit, 'isopach')   
-    toPlot = 'volume_km3';
-elseif strcmpi(C.deposit, 'isomass') && strcmpi(C.runMode, 'probabilistic')
-    toPlot = 'massP_kg';
-elseif strcmpi(C.deposit, 'isomass')
-    toPlot = 'mass_kg';
-end
-    
-if strcmpi(C.runMode, 'probabilistic')
-    for iF = 1:length(fitType)
-        bplot(V.(fitType{iF}).(toPlot), iF, 'nomean', 'nolegend', 'outliers', 'whisker', C.errorBound(1), 'color', cmap(iF,:), 'linewidth',.5, 'width', .5);
-    end
-else
-    for iF = 1:length(fitType)
-        bar(ax, iF, V.(fitType{iF}).(toPlot), 'FaceColor', cmap(iF,:));
-    end 
-end
-
-% Set labels
-xlim([0,length(fitType)+1]);
-ax.XTick       = 0:length(fitType)+2;
-lab            = cell(1, length(fitType)+2);
-lab(2:end-1)   = fitType;
-ax.XTickLabel  = lab;
-
-[~,yl]         = getLabels(C,'isopach');
-ylabel(ax, yl);
-
-function plot_inVSout(ax,V,C,fitType,cmap)
-axes(ax); % Set current axes
-h       = zeros(length(fitType),1);
-l       = cell(length(fitType),1);
-h(1)    = plot(ax, sqrt([0,max(V.yData)]), sqrt([0,max(V.yData)]), '-k', 'linewidth', 1);
-l{1}    = '1:1';
-
-for iF = 1:length(fitType)   
-    if strcmpi(C.runMode, 'probabilistic')
-        tmpYmP = squeeze(V.(fitType{iF}).YmP);
-        for i = 1:size(tmpYmP,2)
-            plot(ax, sqrt(V.yData), sqrt(tmpYmP(:,i)), '.', 'MarkerSize', 8, 'Color', cmap(iF,:));
-        end
-    end
-h(iF+1) = plot(ax, sqrt(V.yData), sqrt(V.(fitType{iF}).Ym), 'o', 'MarkerSize', 5,'MarkerFaceColor', cmap(iF,:), 'MarkerEdgeColor','k', 'LineWidth',.2);
-l{iF+1} = fitType{iF};
-end
-
-for i = 2:length(h)
-    uistack(h(i), 'top');
-end
-legend(h,l);
-
-[xl,yl] = getLabels(C,'InOut');
-xlabel(ax, xl);
-ylabel(ax, yl, 'Interpreter', 'tex');
-
-function plot_fit(ax,V,C,fitType,ydata,cmap)
-axes(ax); % Set current axes
-h       = zeros(length(fitType),1);
-l       = cell(length(fitType),1);
-h(1)    = plot(ax, V.xData, ydata{1}, '+k');
-l{1}    = 'Observations';
-
-for iF = 1:length(fitType)   
-    if strcmpi(C.runMode, 'probabilistic')
-        % Vectors to store probabilistic fits
-        xP = zeros(size(V.(fitType{iF}).XP,2),2);
-        yP = zeros(size(V.(fitType{iF}).XP,2),2);
-        for i = 1:size(V.(fitType{iF}).XP,2)
-            xP(i,1) = prctile(squeeze(V.(fitType{iF}).XP(1,i,:)), C.errorBound(1));
-            xP(i,2) = prctile(squeeze(V.(fitType{iF}).XP(1,i,:)), C.errorBound(2));          
-            yP(i,1) = prctile(squeeze(V.(fitType{iF}).YP(1,i,:)), C.errorBound(1));
-            yP(i,2) = prctile(squeeze(V.(fitType{iF}).YP(1,i,:)), C.errorBound(2));
-        end
-        
-        % Work on yScale
-        if      strcmp(C.yScale, 'ln');         yP = log(yP);
-        elseif  strcmp(C.yScale, 'log10');      yP = log10(yP);
-        end
-        
-        % Do some cleaning of the Weibull data
-        if      strcmpi(fitType{iF}, 'weibull')
-            idx = sum(isinf(yP),2);  % Remove  infs
-            yP  = yP(not(idx),:);
-            xP  = xP(not(idx),:);
-        end
-            plot(ax, xP(:,1), yP(:,1), ':', 'LineWidth',.5, 'Color', cmap(iF,:));
-            plot(ax, xP(:,2), yP(:,2), ':', 'LineWidth',.5, 'Color', cmap(iF,:));
-    end
-    
-    h(iF+1) = plot(ax, V.(fitType{iF}).X, ydata{iF,2}, '-', 'LineWidth',1, 'Color', cmap(iF,:));  % Plot curve  
-    l{iF+1} = fitType{iF};
-end
-
-uistack(h(1), 'top');
-legend(h,l);
-
-[xl,yl] = getLabels(C,'fits');
-xlabel(ax, xl);
-ylabel(ax, yl);
-
-% Get x and y labels
-function [xl, yl] = getLabels(C,plotType)
-% Fits plots
-if strcmp(plotType, 'fits')
-    if      strcmp(C.yScale, 'ln');         yl = 'Ln ';
-    elseif  strcmp(C.yScale, 'log10');      yl = 'Log_1_0 ';
-    else;                                   yl = '';
-    end
-    
-    if      strcmp(C.deposit,'isopach');    yl = [yl, 'Thickness (cm)'];
-                                            xl = 'Isopach area^{0.5} (km)';
-    elseif  strcmp(C.deposit,'thickness');  yl = [yl, 'Thickness (cm)'];
-                                            xl = 'Distance from source (km)';
-    elseif  strcmp(C.deposit,'isomass');    yl = [yl, 'Tephra accumulation (kg/m^2)'];
-                                            xl = 'Isomass area^{0.5} (km)';
-    elseif  strcmp(C.deposit,'isopleth');   yl = [yl, 'Diameter (cm)'];
-                                            xl = 'Isopleth area^{0.5} (km)';
-    end 
-end
-
-% In vs out plots
-if strcmp(plotType, 'InOut')
-    if  strcmp(C.deposit,'isomass');        yl = 'Sqrt Computed mass (kg)';
-                                            xl = 'Sqrt Observed mass (kg)';
-    elseif  strcmp(C.deposit,'isopleth');   yl = 'Sqrt Computed diameter (cm)';
-                                            xl = 'Sqrt Observed diameter (cm)';
-    else;                                   yl = 'Sqrt Computed thickness (cm)';
-                                            xl = 'Sqrt Observed thickness (cm)';
-    end 
-end
-
-% Volume plots
-if strcmp(plotType, 'isopach')
-    if  strcmp(C.deposit,'isomass');        yl = 'Mass (kg)'; xl = [];
-    else;                                   yl = 'Volume (km^3)'; xl = [];
-    end 
-end
-    
-% VEI plots
-if strcmp(plotType, 'VEI')
-    if  strcmp(C.deposit,'isomass');        yl = 'Magnitude'; xl = [];
-    else;                                   yl = 'VEI'; xl = [];
-    end 
-end
 
 function out = prepareOutput(Vtmp,V,C,fitType)
 %% Prepare output
@@ -684,7 +505,7 @@ if strcmpi(C.runMode, 'probabilistic')
         out.volume_range= [prctile(Vtmp.volumeP, C.errorBound(1)), prctile(Vtmp.volumeP, C.errorBound(2))];
         out.volumeP_km3 = Vtmp.volumeP;
         out.VEIP        = log10(Vtmp.volumeP)+5;
-    elseif strcmpi(deposit, 'isomass')
+    elseif strcmpi(C.deposit, 'isomass')
         out.mass_range  = [prctile(Vtmp.volume*1e11, C.errorBound(1)), prctile(Vtmp.volume*1e11, C.errorBound(2))];
         out.massP_kg    = Vtmp.volumeP.*1e11;
         out.magnitudeP  = log10(out.massP_kg)-7;
@@ -714,6 +535,41 @@ if strcmpi(C.runMode, 'probabilistic')
     end
     out.r2P             = reshape(Vtmp.r2P, size(Vtmp.FP,1),size(Vtmp.FP,3));
 end
+
+function writeOutput(V,C,fitType)
+
+if strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass')
+    
+    if strcmpi(C.runMode, 'single') && strcmpi(C.deposit, 'isopach')
+        toKeep      = {'volume_km3', 'VEI', 'r2'};
+        rowName   = toKeep';
+        sz = 3;
+    elseif strcmpi(C.runMode, 'single') && strcmpi(C.deposit, 'isomass')
+        toKeep      = {'mass_kg', 'magnitude', 'r2'};
+        rowName   = toKeep';
+        sz = 3;
+    elseif strcmpi(C.runMode, 'probabilistic') && strcmpi(C.deposit, 'isopach')
+        toKeep      = {'volume_km3', 'VEI', 'r2', 'volume_range'};
+        rowName   = [toKeep(1:end-1), {'volume_km3_min','volume_km3_max'}]';
+        sz = 5;
+    elseif strcmpi(C.runMode, 'probabilistic') && strcmpi(C.deposit, 'isomass')
+        toKeep      = {'mass_kg', 'magnitude', 'r2', 'mass_range'};
+        rowName   = [toKeep(1:end-1), {'mass_kg_min','mass_kg_max'}]';
+        sz = 5;
+    end
+    T = table('RowNames',rowName);
+    for i = 1:length(fitType)
+        T.(fitType{i}) = zeros(sz,1);
+        for j = 1:3
+            T.(fitType{i})(j) = V.(fitType{i}).(toKeep{j});
+        end
+        if strcmpi(C.runMode, 'probabilistic')
+            T.(fitType{i})(4) = V.(fitType{i}).(toKeep{4})(1);
+            T.(fitType{i})(5) = V.(fitType{i}).(toKeep{4})(2);
+        end
+    end
+end
+disp(T);
 
 function [R,V] = fitMe(V,C,fitType)
 %% Fits & volume
@@ -754,7 +610,7 @@ elseif strcmpi(fitType, 'weibull')
 end
 
 % Probabilistic approach
-fprintf(1,'\n');
+%fprintf(1,'\n');
 disp(['Fitting ', fitType]);
 waittext(0,'init');
 if strcmp(C.runMode, 'probabilistic')
@@ -779,6 +635,188 @@ if strcmp(C.runMode, 'probabilistic')
             R.volumeP(iR) = volWBL(R.FP(:,1,iR), R.FP(:,2,iR), R.FP(:,3,iR));
         end
     end
+end
+
+%% PLOTTING FUNCTIONS
+function plot_VEI(ax,V,C,fitType,cmap)
+axes(ax);
+
+% Check which field to plot (whether it is mass or volume)
+if strcmpi(C.deposit, 'isopach') && strcmpi(C.runMode, 'probabilistic')
+    toPlot = 'VEI';
+elseif strcmpi(C.deposit, 'isopach')   
+    toPlot = 'VEI';
+elseif strcmpi(C.deposit, 'isomass') && strcmpi(C.runMode, 'probabilistic')
+    toPlot = 'magnitude';
+elseif strcmpi(C.deposit, 'isomass')
+    toPlot = 'magnitude';
+end
+
+for iF = 1:length(fitType)
+    bar(ax, iF, V.(fitType{iF}).(toPlot), 'FaceColor', cmap(iF,:));
+end
+
+% Set labels
+xlim([0,length(fitType)+1]);
+ax.XTick       = 0:length(fitType)+2;
+lab            = cell(1, length(fitType)+2);
+lab(2:end-1)   = fitType;
+ax.XTickLabel  = regexprep(lab,'(\<[a-z])','${upper($1)}');
+ax.YTick       = 0:7;
+ax.YGrid       = 'on';
+ylim([0,7]);
+[~,yl]         = getLabels(C,'VEI');
+ylabel(ax, yl);
+
+function plot_volume(ax,V,C,fitType,cmap)
+axes(ax);
+
+% Check which field to plot (whether it is mass or volume)
+if strcmpi(C.deposit, 'isopach') && strcmpi(C.runMode, 'probabilistic')
+    toPlot = 'volumeP_km3';
+elseif strcmpi(C.deposit, 'isopach')   
+    toPlot = 'volume_km3';
+elseif strcmpi(C.deposit, 'isomass') && strcmpi(C.runMode, 'probabilistic')
+    toPlot = 'massP_kg';
+elseif strcmpi(C.deposit, 'isomass')
+    toPlot = 'mass_kg';
+end
+    
+if strcmpi(C.runMode, 'probabilistic')
+    for iF = 1:length(fitType)
+        bplot(V.(fitType{iF}).(toPlot), iF, 'nomean', 'nolegend', 'outliers', 'whisker', C.errorBound(1), 'color', cmap(iF,:), 'linewidth',.5, 'width', .5);
+    end
+else
+    for iF = 1:length(fitType)
+        bar(ax, iF, V.(fitType{iF}).(toPlot), 'FaceColor', cmap(iF,:));
+    end 
+end
+
+% Set labels
+xlim([0,length(fitType)+1]);
+ax.XTick       = 0:length(fitType)+2;
+lab            = cell(1, length(fitType)+2);
+lab(2:end-1)   = fitType;
+ax.XTickLabel  = regexprep(lab,'(\<[a-z])','${upper($1)}');
+
+[~,yl]         = getLabels(C,'isopach');
+ylabel(ax, yl);
+
+function plot_inVSout(ax,V,C,fitType,cmap)
+axes(ax); % Set current axes
+h       = zeros(length(fitType),1);
+l       = cell(length(fitType),1);
+h(1)    = plot(ax, sqrt([0,max(V.yData)]), sqrt([0,max(V.yData)]), '-k', 'linewidth', 1);
+l{1}    = '1:1';
+
+for iF = 1:length(fitType)   
+    if strcmpi(C.runMode, 'probabilistic')
+        tmpYmP = squeeze(V.(fitType{iF}).YmP);
+        for i = 1:size(tmpYmP,2)
+            plot(ax, sqrt(V.yData), sqrt(tmpYmP(:,i)), '.', 'MarkerSize', 8, 'Color', cmap(iF,:));
+        end
+    end
+h(iF+1) = plot(ax, sqrt(V.yData), sqrt(V.(fitType{iF}).Ym), 'o', 'MarkerSize', 5,'MarkerFaceColor', cmap(iF,:), 'MarkerEdgeColor','k', 'LineWidth',.2);
+l{iF+1} = fitType{iF};
+end
+
+for i = 2:length(h)
+    uistack(h(i), 'top');
+end
+legend(h,l);
+
+[xl,yl] = getLabels(C,'InOut');
+xlabel(ax, xl);
+ylabel(ax, yl, 'Interpreter', 'tex');
+axis square
+
+function plot_fit(ax,V,C,fitType,ydata,cmap)
+axes(ax); % Set current axes
+h       = zeros(length(fitType),1);
+l       = cell(length(fitType),1);
+h(1)    = plot(ax, V.xData, ydata{1}, '+k');
+l{1}    = 'Observations';
+
+for iF = 1:length(fitType)   
+    if strcmpi(C.runMode, 'probabilistic')
+        % Vectors to store probabilistic fits
+        xP = zeros(size(V.(fitType{iF}).XP,2),2);
+        yP = zeros(size(V.(fitType{iF}).XP,2),2);
+        for i = 1:size(V.(fitType{iF}).XP,2)
+            xP(i,1) = prctile(squeeze(V.(fitType{iF}).XP(1,i,:)), C.errorBound(1));
+            xP(i,2) = prctile(squeeze(V.(fitType{iF}).XP(1,i,:)), C.errorBound(2));          
+            yP(i,1) = prctile(squeeze(V.(fitType{iF}).YP(1,i,:)), C.errorBound(1));
+            yP(i,2) = prctile(squeeze(V.(fitType{iF}).YP(1,i,:)), C.errorBound(2));
+        end
+        
+        % Work on yScale
+        if      strcmp(C.yScale, 'ln');         yP = log(yP);
+        elseif  strcmp(C.yScale, 'log10');      yP = log10(yP);
+        end
+        
+        % Do some cleaning of the Weibull data
+        if      strcmpi(fitType{iF}, 'weibull')
+            idx = sum(isinf(yP),2);  % Remove  infs
+            yP  = yP(not(idx),:);
+            xP  = xP(not(idx),:);
+        end
+            plot(ax, xP(:,1), yP(:,1), ':', 'LineWidth',.5, 'Color', cmap(iF,:));
+            plot(ax, xP(:,2), yP(:,2), ':', 'LineWidth',.5, 'Color', cmap(iF,:));
+    end
+    
+    h(iF+1) = plot(ax, V.(fitType{iF}).X, ydata{iF,2}, '-', 'LineWidth',1, 'Color', cmap(iF,:));  % Plot curve  
+    l{iF+1} = fitType{iF};
+end
+
+uistack(h(1), 'top');
+legend(h,l);
+
+[xl,yl] = getLabels(C,'fits');
+xlabel(ax, xl);
+ylabel(ax, yl);
+
+function [xl, yl] = getLabels(C,plotType)
+% Get x and y labels
+if strcmp(plotType, 'fits')
+    if      strcmp(C.yScale, 'ln');         yl = 'Ln ';
+    elseif  strcmp(C.yScale, 'log10');      yl = 'Log_1_0 ';
+    else;                                   yl = '';
+    end
+    
+    if      strcmp(C.deposit,'isopach');    yl = [yl, 'Thickness (cm)'];
+                                            xl = 'Square-root of isopach area (km)';
+    elseif  strcmp(C.deposit,'transect');  yl = [yl, 'Thickness (cm)'];
+                                            xl = 'Distance from source (km)';
+    elseif  strcmp(C.deposit,'isomass');    yl = [yl, 'Tephra accumulation (kg/m^2)'];
+                                            xl = 'Square-root of isomass area (km)';
+    elseif  strcmp(C.deposit,'isopleth');   yl = [yl, 'Diameter (cm)'];
+                                            xl = 'Square-root of isopleth area (km)';
+    end 
+end
+
+% In vs out plots
+if strcmp(plotType, 'InOut')
+    if  strcmp(C.deposit,'isomass');        yl = 'Square-root of computed mass (kg)';
+                                            xl = 'Square-root of cbserved mass (kg)';
+    elseif  strcmp(C.deposit,'isopleth');   yl = 'Square-root of computed diameter (cm)';
+                                            xl = 'Square-root of cbserved diameter (cm)';
+    else;                                   yl = 'Square-root of computed thickness (cm)';
+                                            xl = 'Square-root of cbserved thickness (cm)';
+    end 
+end
+
+% Volume plots
+if strcmp(plotType, 'isopach')
+    if  strcmp(C.deposit,'isomass');        yl = 'Mass (kg)'; xl = [];
+    else;                                   yl = 'Volume (km^3)'; xl = [];
+    end 
+end
+    
+% VEI plots
+if strcmp(plotType, 'VEI')
+    if  strcmp(C.deposit,'isomass');        yl = 'Magnitude'; xl = [];
+    else;                                   yl = 'VEI'; xl = [];
+    end 
 end
 
 %% MISC FUNCTIONS
@@ -887,7 +925,7 @@ X 	= cell(length(idx)-1,1);  % X data for extrapolation
 Y   = cell(length(idx)-1,1);  % Y(X)
 Ym  = cell(length(idx)-1,1);  % Y(X) for observed points
 r2  = zeros(length(idx)-1,1); % R-square
-Xt  = 0:1:1000;
+%Xt  = 0:1:1000;
 
 % 1 segment
 if isempty(Aip)
