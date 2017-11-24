@@ -60,7 +60,7 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %                       - 'isomass':       Calculates the tephra mass (kg) based on Ln(Mass accumulation) vs. sqrt isomass area relationship
 %                                       xData: square-root of isomass area (km)
 %                                       yData: isomass accumulation (kg/m2)
-%                       - 'transect':  Thinning profile based on Ln(Thickness) vs. distance relationship
+%                       - 'transect':   Thinning profile based on Ln(Thickness) vs. distance relationship
 %                                       xData: distance from source (km)
 %                                       yData: thickness (cm)
 %                       - 'isopleth':     Fining profile based on Ln(diameter of maximum clast) vs. sqrt isoleth area relationship
@@ -174,6 +174,13 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %
 %           5.1 Fining trend
 %               fining  = tephraFits(area, diameter, {'exponential', 'powerlaw'}, 'deposit', 'isopleth', 'C', 20)
+
+
+%% Check if the first two arguments are structures, in witch cases run the classification script
+if isstruct(xData) && isstruct(yData)
+    getClassification(xData, yData);
+    return
+end
 
 warning off backtrace % turn all warnings off
 addpath(genpath('Dependencies/'))
@@ -320,9 +327,10 @@ if ~isempty(findCell(fitType, 'exponential'))
 end    
 if ~isempty(findCell(fitType, 'powerlaw'))
     % Check if distal integration limit is specified
-    if isempty(findCell(varargin, 'C')) && ~strcmpi(C.deposit, 'isopleth')    
+    if isempty(findCell(varargin, 'C')) && (strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass'))
                                             error('The power-law method requires to provide the distal integration limit (i.e. argument C)')
-    elseif ~strcmpi(C.deposit, 'isopleth');   V.fitProps.PL_C = varargin{findCell(varargin, 'C')+1}; 
+    elseif strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass')
+                                            V.fitProps.PL_C = varargin{findCell(varargin, 'C')+1}; 
     else;                                   V.fitProps.PL_C = 100;  % In case deposit is 'isopleth', set an arbitrary distal integration limit
     end
     
@@ -354,6 +362,7 @@ tmp         = [reshape(xData, length(xData), 1), reshape(yData, length(yData), 1
 [tmp, idx]  = sortrows(tmp,1);
 V.xData     = tmp(:,1);
 V.yData     = tmp(:,2);
+V.deposit   = C.deposit;
 
 %% Run
 % If probabilstic mode
@@ -440,7 +449,11 @@ if ~strcmp(C.plotType, 'none')
     end
 end
 
+% Display table
 writeOutput(V,C,fitType);
+% Remove xData and yData from final structure
+V = rmfield(V, {'xData', 'yData'});
+
 warning on backtrace % turn all warnings on
 
 function out = prepareOutput(Vtmp,V,C,fitType)
@@ -561,15 +574,19 @@ if strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass')
     for i = 1:length(fitType)
         T.(fitType{i}) = zeros(sz,1);
         for j = 1:3
-            T.(fitType{i})(j) = V.(fitType{i}).(toKeep{j});
+            if length(V.(fitType{i}).(toKeep{j})) > 1
+                T.(fitType{i})(j) = mean(V.(fitType{i}).(toKeep{j}));
+            else
+                T.(fitType{i})(j) = V.(fitType{i}).(toKeep{j});
+            end
         end
         if strcmpi(C.runMode, 'probabilistic')
             T.(fitType{i})(4) = V.(fitType{i}).(toKeep{4})(1);
             T.(fitType{i})(5) = V.(fitType{i}).(toKeep{4})(2);
         end
     end
+    disp(T);
 end
-disp(T);
 
 function [R,V] = fitMe(V,C,fitType)
 %% Fits & volume
@@ -728,7 +745,7 @@ legend(h,l);
 [xl,yl] = getLabels(C,'InOut');
 xlabel(ax, xl);
 ylabel(ax, yl, 'Interpreter', 'tex');
-axis square
+axis tight, axis square
 
 function plot_fit(ax,V,C,fitType,ydata,cmap)
 axes(ax); % Set current axes
@@ -797,11 +814,11 @@ end
 % In vs out plots
 if strcmp(plotType, 'InOut')
     if  strcmp(C.deposit,'isomass');        yl = 'Square-root of computed mass (kg)';
-                                            xl = 'Square-root of cbserved mass (kg)';
+                                            xl = 'Square-root of observed mass (kg)';
     elseif  strcmp(C.deposit,'isopleth');   yl = 'Square-root of computed diameter (cm)';
-                                            xl = 'Square-root of cbserved diameter (cm)';
+                                            xl = 'Square-root of observed diameter (cm)';
     else;                                   yl = 'Square-root of computed thickness (cm)';
-                                            xl = 'Square-root of cbserved thickness (cm)';
+                                            xl = 'Square-root of observed thickness (cm)';
     end 
 end
 
@@ -998,8 +1015,8 @@ ydata   = log10(ydata);
 F(2)    = ( sum(xdata.*ydata) - sum(xdata)*sum(ydata)/N ) / ( sum(xdata.^2) - sum(xdata)^2/N ); % Slope
 F(1)    = mean(ydata)-F(2)*mean(xdata);
 
-B       = (T0/10^F(1))^(-1/(-1*F(2)));                                      % Calculate proximal integration limit
-X       = linspace(B, 10^xdata(end) + 10^xdata(end)*C.maxDist, 100);        % X vector
+%B       = (T0/10^F(1))^(-1/(-1*F(2)));                                      % Calculate proximal integration limit
+X       = linspace(.1, 10^xdata(end) + 10^xdata(end)*C.maxDist, 100);        % X vector
 Y       = 10^F(1).*X.^(F(2));                                               % Y(X)
 Ym      = 10^F(1).*10.^xdata.^(F(2));
 r2      = rsquare(10.^ydata, 10^F(1).*(10.^xdata).^(F(2)));                 % R-square
@@ -1066,4 +1083,87 @@ elseif vol < 0.001
     n_r     = [1, 10];
 end
     
+%% Classification
+function getClassification(xData, yData)
+
+if strcmp(xData.deposit, 'isopach') && strcmp(yData.deposit, 'isopleth')
+    isopleth = xData;
+    isopach  = yData;   
+elseif strcmp(yData.deposit, 'isopach') && strcmp(xData.deposit, 'isopleth')
+    isopleth = yData;
+    isopach  = xData;   
+else
+    error('The classification function requires isopleth and isopach inputs')
+end
+
+if isfield(isopach, 'exponential') && isfield(isopleth, 'exponential')
+    plotClassification(isopleth, isopach, 'Pyle89');
+end
+
+if isfield(isopach, 'exponential') && isfield(isopleth, 'exponential')
+    plotClassification(isopleth, isopach, 'BonadonnaCosta13');
+end
+
+function h = plotClassification(isopleth, isopach, type)
+
+h   = figure;
+ax  = axes('Parent',h);
+hold on
+if strcmpi(type, 'Pyle89')
+    img = imread('style_Pyle89.jpg');
+    img = img(:,:,1);
+
+    xVec    = logspace(-1,2,size(img,2));
+    yVec    = linspace(0,4,size(img,1));
+
+    pcolor(xVec,yVec,img);
+    axis ij
+    ax.XScale = 'log';
+    colormap(gray);
+    xlabel('Thickness half-distance b_T (km)');
+    ylabel('Half-distanceratio b_C/b_T');
     
+    if isfield(isopach.exponential, 'bcP') && isfield(isopleth.exponential, 'btP')
+        if size(isopach.exponential.bcP,2) == size(isopleth.exponential.btP,2)
+            plot( isopach.exponential.bc(1,:), isopleth.exponential.bt(1,:)/isopach.exponential.bc(1,:), 'xr')
+        end
+    end
+    plot( isopach.exponential.bc(1), isopleth.exponential.bt(1)/isopach.exponential.bc(1), 'xr')
+    
+elseif strcmpi(type, 'BonadonnaCosta13')
+    img = imread('style_BC13.jpg');
+    img = img(:,:,1);
+    
+    xVec    = logspace(0,log10(400),size(img,2));
+    yVec    = logspace(-2,2,size(img,1));
+
+    pcolor(xVec,yVec,flipud(img));
+    ax.XScale = 'log';
+    ax.YScale = 'log';
+    colormap(bone);
+    xlabel('Log_{10} \lambda_{th}');
+    ylabel('Log_{10} \lambda_{MC}/\lambda_{th}');
+    
+    if isfield(isopach.weibull, 'lambda') && isfield(isopleth.weibull, 'lambda')
+        if size(isopach.weibull.lambdaP,2) == size(isopleth.weibull.lambdaP,2)
+            plot( isopach.weibull.lambdaP(1,:), isopleth.weibull.lambdaP(1,:)/isopach.weibull.lambdaP(1,:), 'xr')
+        end
+    end
+    plot( isopach.weibull.lambda(1), isopleth.weibull.lambda(1)/isopach.weibull.lambda(1), 'xr')
+    
+elseif strcmpi(type, 'Mastin09')
+    img = imread('style_Mastin09.jpg');
+    img = img(:,:,1);
+    
+    xVec    = linspace(0,60,size(img,2));
+    yVec    = logspace(4,10,size(img,1));
+
+    pcolor(xVec,yVec,flipud(img));
+    ax.YScale = 'log';
+    colormap(bone);
+    xlabel('Log_{10} Plume height (km)');
+    ylabel('Log_{10} MER (kg/s)');
+end
+
+shading flat, axis tight, box on, set(ax, 'layer', 'top');
+
