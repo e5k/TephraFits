@@ -478,7 +478,9 @@ if strcmpi(fitType, 'exponential')
     out.I           = Vtmp.I;
     if strcmpi(C.deposit, 'isopleth')
         % Half distance = log(2) / -k * sqrt(pi)
-        out.bc      = -1*.391066419./out.k;
+        out.bc      = -1*.391066419./out.k;      
+        out.HB      = (out.bc - (out.bc.*(out.bc + 4*.41*7.3)).^(1/2)).^2./(4*.41^2); % Height of neutral buoyancy, equation 11 of Pyle (1989)
+        out.HT      = out.HB/0.7; % Neutral buoyancy to plume height, Sparks (1986)
     else
         out.bt      = -1*.391066419./out.k;
     end
@@ -500,9 +502,9 @@ elseif strcmpi(fitType, 'weibull')
     
     % If isopleth, calculate the plume height
     if strcmpi(C.deposit, 'isopleth')
-        out.Ht      = 5.01 * out.lambda^.55;    % Equation 7 of Bonadonna and Costa (2013)
+        out.H      = 5.01 * out.lambda^.55;    % Equation 7 of Bonadonna and Costa (2013)
         % If the calculated plume height is outside of the range of plume heights used for the empirical fit
-        if out.Ht < 7 || out.Ht > 50
+        if out.H < 7 || out.H > 50
             warning('The plume height calculated from the Weibull parameter lambda_ML is outside of the range of plume heights used to define the empirical fit')
         end
     end
@@ -530,9 +532,11 @@ if strcmpi(C.runMode, 'probabilistic')
         out.kP          = reshape(Vtmp.FP(:,2,:), size(Vtmp.FP,1),size(Vtmp.FP,3));
         out.IP          = reshape(Vtmp.IP, size(Vtmp.FP,1),size(Vtmp.FP,3));
         if strcmpi(C.deposit, 'isopleth')
-            out.bcP     = -1*.391066419./out.k;
+            out.bcP     = -1*.391066419./out.kP;
+            out.HBP     = (out.bcP - (out.bcP.*(out.bcP + 4*.41*7.3)).^(1/2)).^2./(4*.41^2); % Height of neutral buoyancy, equation 11 of Pyle (1989)
+            out.HTP     = out.HBP./0.7; % Neutral buoyancy to plume height, Sparks (1986)     
         else
-            out.btP     = -1*.391066419./out.k;
+            out.btP     = -1*.391066419./out.kP;
         end
     elseif strcmpi(fitType, 'powerlaw')
         out.mP          = -1.*reshape(Vtmp.FP(:,2,:), size(Vtmp.FP,1),size(Vtmp.FP,3));
@@ -543,7 +547,7 @@ if strcmpi(C.runMode, 'probabilistic')
         out.nP          = reshape(Vtmp.FP(:,3,:), size(Vtmp.FP,1),size(Vtmp.FP,3));
         % If isopleth, calculate the plume height
         if strcmpi(C.deposit, 'isopleth')
-            out.HtP     = 5.01 .* out.lambdaP.^.55;    % Equation 7 of Bonadonna and Costa (2013)
+            out.HP     = 5.01 .* out.lambdaP.^.55;    % Equation 7 of Bonadonna and Costa (2013)
         end
     end
     out.r2P             = reshape(Vtmp.r2P, size(Vtmp.FP,1),size(Vtmp.FP,3));
@@ -1100,7 +1104,7 @@ if isfield(isopach, 'exponential') && isfield(isopleth, 'exponential')
     plotClassification(isopleth, isopach, 'Pyle89');
 end
 
-if isfield(isopach, 'exponential') && isfield(isopleth, 'exponential')
+if isfield(isopach, 'weibull') && isfield(isopleth, 'weibull')
     plotClassification(isopleth, isopach, 'BonadonnaCosta13');
 end
 
@@ -1125,10 +1129,10 @@ if strcmpi(type, 'Pyle89')
     
     if isfield(isopach.exponential, 'bcP') && isfield(isopleth.exponential, 'btP')
         if size(isopach.exponential.bcP,2) == size(isopleth.exponential.btP,2)
-            plot( isopach.exponential.bc(1,:), isopleth.exponential.bt(1,:)/isopach.exponential.bc(1,:), 'xr')
+            plot( isopach.exponential.bcP(1,:), isopleth.exponential.btP(1,:)/isopach.exponential.bcP(1,:), '.k')
         end
     end
-    plot( isopach.exponential.bc(1), isopleth.exponential.bt(1)/isopach.exponential.bc(1), 'xr')
+    plot( isopach.exponential.bc(1), isopleth.exponential.bt(1)/isopach.exponential.bc(1), 'ok', 'MarkerFaceColor','r')
     
 elseif strcmpi(type, 'BonadonnaCosta13')
     img = imread('style_BC13.jpg');
@@ -1144,25 +1148,13 @@ elseif strcmpi(type, 'BonadonnaCosta13')
     xlabel('Log_{10} \lambda_{th}');
     ylabel('Log_{10} \lambda_{MC}/\lambda_{th}');
     
-    if isfield(isopach.weibull, 'lambda') && isfield(isopleth.weibull, 'lambda')
+    if isfield(isopach.weibull, 'lambdaP') && isfield(isopleth.weibull, 'lambdaP')
         if size(isopach.weibull.lambdaP,2) == size(isopleth.weibull.lambdaP,2)
-            plot( isopach.weibull.lambdaP(1,:), isopleth.weibull.lambdaP(1,:)/isopach.weibull.lambdaP(1,:), 'xr')
+            plot( isopach.weibull.lambdaP(1,:), isopleth.weibull.lambdaP(1,:)/isopach.weibull.lambdaP(1,:), '.k')
         end
     end
-    plot( isopach.weibull.lambda(1), isopleth.weibull.lambda(1)/isopach.weibull.lambda(1), 'xr')
-    
-elseif strcmpi(type, 'Mastin09')
-    img = imread('style_Mastin09.jpg');
-    img = img(:,:,1);
-    
-    xVec    = linspace(0,60,size(img,2));
-    yVec    = logspace(4,10,size(img,1));
+    plot( isopach.weibull.lambda(1), isopleth.weibull.lambda(1)/isopach.weibull.lambda(1),'ok', 'MarkerFaceColor','r')
 
-    pcolor(xVec,yVec,flipud(img));
-    ax.YScale = 'log';
-    colormap(bone);
-    xlabel('Log_{10} Plume height (km)');
-    ylabel('Log_{10} MER (kg/s)');
 end
 
 shading flat, axis tight, box on, set(ax, 'layer', 'top');
