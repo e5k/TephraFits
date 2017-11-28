@@ -447,6 +447,25 @@ if ~strcmp(C.plotType, 'none')
         end
         delete(f)
     end
+    
+    % Plot variability of volume/mass as a function of C
+    if (strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass')) && ~isempty(findCell(fitType, 'powerlaw')) 
+        if strcmpi(C.deposit, 'isopach');   toPlot = 'volume_km3';
+        else;                               toPlot = 'mass_kg';
+        end
+        
+        figure;
+        yyaxis left; 
+        plot(V.powerlaw.C.range, V.powerlaw.C.volume, '-*');
+        [~,yl]         = getLabels(C,'isopach');
+        ylabel(yl);
+        
+        yyaxis right;
+        plot(V.powerlaw.C.range, (V.powerlaw.C.volume-V.powerlaw.(toPlot))./V.powerlaw.(toPlot).*100, '-*');
+        ylabel('Discrepancy (%)');
+        xlabel('C (km)')
+        title('V_P_L = f(C)')
+    end
 end
 
 % Display table
@@ -488,8 +507,15 @@ elseif strcmpi(fitType, 'powerlaw')
     out.m           = -1*Vtmp.F(2);
     out.TPl         = 10^Vtmp.F(1);
     % Display a warning if m<2
-    if out.m < 2
-        warning('The power law exponent is < 2, which means that the volume is highly sensitive to the distal integration limit.');
+    if (out.m < 2) && (strcmpi(C.deposit, 'isopleth') || strcmpi(C.deposit, 'isomass'))
+        warning('The power law exponent is < 2, which means that the volume/mass is highly sensitive to the distal integration limit.');
+    end
+    % Volume/mass sensitivity to C
+    if strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass')
+        out.C       = Vtmp.C;
+        if strcmpi(C.deposit, 'isomass')
+            out.C.volume = out.C.volume*1e11;
+        end
     end
 elseif strcmpi(fitType, 'weibull')
     out.theta       = Vtmp.F(1);
@@ -608,7 +634,14 @@ elseif strcmpi(fitType, 'powerlaw')
     else;                               T0 = V.exponential.T0(1);          % Here I take the T0 from the proximal segment
     end
     [R.F,R.X,R.Y,R.r2,R.Ym]     = fitPL(V.xData, V.yData, T0, C);    
-    R.volume               = volPL(T0, -1*R.F(2), 10^R.F(1), V.fitProps.PL_C);
+    R.volume                    = volPL(T0, -1*R.F(2), 10^R.F(1), V.fitProps.PL_C);
+    
+    % Define a range of C values and calculate the volume
+    R.C.range                   = logspace(floor(log10(V.fitProps.PL_C)), ceil(log10(V.fitProps.PL_C)), 20);
+    for iv = 1:length(R.C.range)
+        tmpF                    = fitPL(V.xData, V.yData, T0, C); 
+        R.C.volume(iv)          = volPL(T0, -1*tmpF(2), 10^tmpF(1), R.C.range(iv));
+    end
     
 elseif strcmpi(fitType, 'weibull')
     % If optimization ranges are not defined, use volume
@@ -1091,11 +1124,11 @@ end
 function getClassification(xData, yData)
 
 if strcmp(xData.deposit, 'isopach') && strcmp(yData.deposit, 'isopleth')
-    isopleth = xData;
-    isopach  = yData;   
-elseif strcmp(yData.deposit, 'isopach') && strcmp(xData.deposit, 'isopleth')
     isopleth = yData;
     isopach  = xData;   
+elseif strcmp(yData.deposit, 'isopach') && strcmp(xData.deposit, 'isopleth')
+    isopleth = xData;
+    isopach  = yData;   
 else
     error('The classification function requires isopleth and isopach inputs')
 end
@@ -1127,13 +1160,19 @@ if strcmpi(type, 'Pyle89')
     xlabel('Thickness half-distance b_T (km)');
     ylabel('Half-distanceratio b_C/b_T');
     
-    if isfield(isopach.exponential, 'bcP') && isfield(isopleth.exponential, 'btP')
-        if size(isopach.exponential.bcP,2) == size(isopleth.exponential.btP,2)
-            plot( isopach.exponential.bcP(1,:), isopleth.exponential.btP(1,:)/isopach.exponential.bcP(1,:), '.k')
+    leg = cell(length(isopach.exponential.bt), 1);
+    cmp = lines(length(isopach.exponential.bt));
+    P   = zeros(length(isopach.exponential.bt), 1);
+    for i = 1:length( isopach.exponential.bt )
+        if isfield(isopach.exponential, 'btP') && isfield(isopleth.exponential, 'bcP')
+            if size(isopach.exponential.btP,2) == size(isopleth.exponential.bcP,2)
+                plot( isopach.exponential.btP(i,:), isopleth.exponential.bcP(1,:)/isopach.exponential.btP(i,:), '.', 'Color', cmp(i,:))
+            end
         end
+        P(i)   = plot( isopach.exponential.bt(i), isopleth.exponential.bc/isopach.exponential.bt(i), 'ok', 'MarkerFaceColor', cmp(i,:));
+        leg{i} = ['b_T = ', num2str(isopach.exponential.bt(i),'%.1f')];
     end
-    plot( isopach.exponential.bc(1), isopleth.exponential.bt(1)/isopach.exponential.bc(1), 'ok', 'MarkerFaceColor','r')
-    
+    legend(P,leg);
 elseif strcmpi(type, 'BonadonnaCosta13')
     img = imread('style_BC13.jpg');
     img = img(:,:,1);
