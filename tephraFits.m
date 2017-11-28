@@ -455,15 +455,16 @@ if ~strcmp(C.plotType, 'none')
         end
         
         figure;
-        yyaxis left; 
-        plot(V.powerlaw.C.range, V.powerlaw.C.volume, '-*');
         [~,yl]         = getLabels(C,'isopach');
-        ylabel(yl);
+        [ax, l1, l2] = plotyy(V.powerlaw.C.range, V.powerlaw.C.volume, V.powerlaw.C.range, (V.powerlaw.C.volume-V.powerlaw.(toPlot))./V.powerlaw.(toPlot).*100,...
+            'plot', 'plot')
+        ylabel(ax(1), yl);
+        xlabel(ax(1), 'C (km)');
+        ylabel(ax(2), 'Discrepancy (%)');
         
-        yyaxis right;
-        plot(V.powerlaw.C.range, (V.powerlaw.C.volume-V.powerlaw.(toPlot))./V.powerlaw.(toPlot).*100, '-*');
-        ylabel('Discrepancy (%)');
-        xlabel('C (km)')
+        l1.Marker = 'x';
+        l2.Marker = 'x';
+        
         title('V_P_L = f(C)')
     end
 end
