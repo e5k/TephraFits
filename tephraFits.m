@@ -267,7 +267,7 @@ if strcmp(C.runMode, 'probabilistic')
             % In case of a constant error on x and y, it is now possible to enter only one value instead of a vector
             C.xError = ones(size(xData)).*varargin{findCell(varargin, 'xError')+1};
             C.yError = ones(size(yData)).*varargin{findCell(varargin, 'yError')+1};
-        elseif (size(xData,1) ~= size(varargin{findCell(varargin, 'xError')+1},1)) || (size(xData,2) ~= size(varargin{findCell(varargin, 'xError')+1},2)) || (size(yData,1) ~= size(varargin{findCell(varargin, 'yError')+1},1)) ||(size(yData,2) ~= size(varargin{findCell(varargin, 'yError')+1},2))
+        elseif (numel(xData) ~= numel(varargin{findCell(varargin, 'xError')+1})) || (numel(yData) ~= numel(varargin{findCell(varargin, 'yError')+1}))
             error('The size and dimensions of xError and yError should be the same as xData and yData');
         else
             C.xError = varargin{findCell(varargin, 'xError')+1};
@@ -791,6 +791,16 @@ h       = zeros(length(fitType),1);
 l       = cell(length(fitType),1);
 h(1)    = plot(ax, V.xData, ydata{1}, '+k');
 l{1}    = 'Observations';
+% Plot error bars
+if strcmpi(C.runMode, 'probabilistic')
+    for i = 1:length(V.xData)
+        xE = [V.xData(i)-V.xData(i).*C.xError(i)/100, V.xData(i)+V.xData(i).*C.xError(i)/100]; 
+        yE = [ydata{1}(i)-ydata{1}(i).*C.yError(i)/100, ydata{1}(i)+ydata{1}(i).*C.yError(i)/100];
+        plot(xE, [ydata{1}(i),ydata{1}(i)], '-', 'Color', [.8 .8 .8], 'LineWidth', 2);
+        plot([V.xData(i),V.xData(i)], yE, '-', 'Color', [.8 .8 .8], 'LineWidth', 2);
+    end
+end
+
 
 for iF = 1:length(fitType)   
     if strcmpi(C.runMode, 'probabilistic')
@@ -962,11 +972,12 @@ I	= zeros(length(idx)-1,1); % Intersection
 
 for i = 1:length(idx)-1
     % Define range of data to perform the fit
-    if i == 1  
-        idxS = idx(i);          % Here, the intersection of the two segments is not fixed at a given point
-    else
-        idxS = idx(i)+1;        % In case there are multiple segments, this ensures that the same point is not used twice to define the fit.
-    end
+%     if i == 1  
+%         idxS = idx(i);          % Here, the intersection of the two segments is not fixed at a given point
+%     else
+%         idxS = idx(i)+1;        % In case there are multiple segments, this ensures that the same point is not used twice to define the fit.
+%     end
+    idxS    = idx(i);
     idxE    = idx(i+1);
     
     % Fit data
