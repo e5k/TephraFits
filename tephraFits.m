@@ -234,7 +234,7 @@ if ~isempty(findCell(varargin, 'maxDistance'))
     C.maxDist = varargin{findCell(varargin, 'maxDistance')+1};  
 else
     C.maxDist = 1;                                % Defines the maximum extent of extrapolation in distal part. 1 means 100%, i.e. the distance to the most distal point is doubled
-    warning('No maximum interpolation was specified, using 100% of the distance to the most distal value')
+    display(sprintf(' - No maximum interpolation was specified, using 100%% of the distance to the most distal value'))
 end
 % Check Fits to plot
 if ~isempty(findCell(varargin, 'fit2plot'))         
@@ -261,7 +261,7 @@ if strcmp(C.runMode, 'probabilistic')
         C.errorType = varargin{findCell(varargin, 'errorType')+1};
     else
         C.errorType     = 'normal';                         % Error envelop
-        warning('No error envelop was specified, using a normal distribution');
+        display(sprintf(' - No error envelop was specified, using a normal distribution'))
     end
     
     % Check xError and yError
@@ -301,7 +301,7 @@ if strcmp(C.runMode, 'probabilistic')
         end
     else
         C.errorBound = [5,95];
-        warning('No error bounds were specified, using the 5th and 95th percentiles');
+        display(sprintf(' - No error bounds were specified, using the 5th and 95th percentiles'))
     end
 end
 
@@ -317,7 +317,7 @@ end
 if ~isempty(findCell(fitType, 'exponential')) 
     % Check if break-in-slope is specified
     if isempty(findCell(varargin, 'BIS'));  V.fitProps.EXP_BIS = [];
-                                            warning('No break-in-slope index specified, using one exponential segment. Use ''BIS'' argument to specify the break-in-slope indices.')
+                                            display(sprintf(' - No break-in-slope index specified, using one exponential segment. Use ''BIS'' argument to specify the break-in-slope indices.'))
     elseif length(varargin{findCell(varargin, 'BIS')+1}) > 2
                                             error('Specify up to 3 segments');
     else                                   
@@ -353,7 +353,7 @@ if ~isempty(findCell(fitType, 'weibull'))
                                             error('Specify both Weibull optimization ranges of lambda and n')
     % If the ranges are not directly specified but other fits are requested AND the deposit type is mass or volume
     elseif isempty(findCell(varargin, 'lambdaRange')) && length(fitType) > 1 && (strcmp(C.deposit, 'isopach') || strcmp(C.deposit, 'isomass'))
-                                            warning('No initial ranges of lambda/n specified for the Weibull optimization. Using the average volume of all other fits to estimate initial ranges.\n In case deposit was set to ''isomass'', conversion to volume using a density of 1000 kg/m3');
+                                            display(sprintf(' - No initial ranges of lambda/n specified for the Weibull optimization. Using the average volume of all other fits to estimate initial ranges.\n In case deposit was set to ''isomass'', conversion to volume using a density of 1000 kg/m3'))
     elseif strcmpi(C.deposit, 'isopleth') && (isempty(findCell(varargin, 'lambdaRange')) || isempty(findCell(varargin, 'nRange')))
                                             error('When deposit is set to ''isopleth'', both lambdaRange and nRange must be specified')
     else;                                   error('Initial ranges of lambda and n must be specified for the Weibull optimization with the arguments ''lambdaRange'' and ''nRange'' as a 1x2 vector containing [min, max]');
@@ -460,7 +460,7 @@ if ~strcmp(C.plotType, 'none')
         figure;
         [~,yl]         = getLabels(C,'isopach');
         [ax, l1, l2] = plotyy(V.powerlaw.C.range, V.powerlaw.C.volume, V.powerlaw.C.range, (V.powerlaw.C.volume-V.powerlaw.(toPlot))./V.powerlaw.(toPlot).*100,...
-            'plot', 'plot')
+            'plot', 'plot');
         ylabel(ax(1), yl);
         xlabel(ax(1), 'C (km)');
         ylabel(ax(2), 'Discrepancy (%)');
