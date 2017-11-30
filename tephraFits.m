@@ -180,6 +180,9 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 if isstruct(xData) && isstruct(yData)
     getClassification(xData, yData);
     return
+elseif nargin == 2
+    plotXY(xData, yData);
+    return
 end
 
 warning off backtrace % turn all warnings off
@@ -739,7 +742,7 @@ end
     
 if strcmpi(C.runMode, 'probabilistic')
     for iF = 1:length(fitType)
-        bplot(V.(fitType{iF}).(toPlot), iF, 'nomean', 'nolegend', 'outliers', 'whisker', C.errorBound(1), 'color', cmap(iF,:), 'linewidth',.5, 'width', .5);
+        bplot(V.(fitType{iF}).(toPlot), iF, 'nomean', 'nolegend', 'nooutliers', 'whisker', C.errorBound(1), 'color', cmap(iF,:), 'linewidth',.5, 'width', .5);
     end
 else
     for iF = 1:length(fitType)
@@ -883,6 +886,10 @@ if strcmp(plotType, 'VEI')
     else;                                   yl = 'VEI'; xl = [];
     end 
 end
+
+function plotXY(xData, yData)
+figure;
+semilogy(xData, yData, ':ko', 'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'r')
 
 %% MISC FUNCTIONS
 % Finds the cell index of a string in a cell array
