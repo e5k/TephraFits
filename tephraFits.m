@@ -1203,8 +1203,8 @@ elseif strcmpi(type, 'BonadonnaCosta13')
     ax.XScale = 'log';
     ax.YScale = 'log';
     colormap(bone);
-    xlabel('Log_{10} \lambda_{th}');
-    ylabel('Log_{10} \lambda_{MC}/\lambda_{th}');
+    xlabel('Log_{10} \lambda_{TH}');
+    ylabel('Log_{10} \lambda_{MC}/\lambda_{TH}');
     
     if isfield(isopach.weibull, 'lambdaP') && isfield(isopleth.weibull, 'lambdaP')
         if size(isopach.weibull.lambdaP,2) == size(isopleth.weibull.lambdaP,2)
