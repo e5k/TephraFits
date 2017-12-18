@@ -53,7 +53,7 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %               vWBL = tephraFits(thickness, area, 'weibull', 'isopach', lambdaRange, [0.1, 1000], nRange, [0.1, 1000])
 %
 %   Optional imput arguments passed as parameter pairs
-%       'deposit':      Defines the type of deposit to fit
+%       'dataType':      Defines the type of deposit to fit
 %                       - 'isopach':    Calculates the tephra volume (km3) based on Ln(Thickness) vs. sqrt isopach area relationship (default)
 %                                       xData: square-root of isopach area (km)
 %                                       yData: isopach thickness (cm)
@@ -166,14 +166,14 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %           distance    = [0.5, 0.6, 1, 1.5 1.6, 1.7, 1.9, 2.0, 2.1, 2.4,2.6, 1.3];     % Distance from source (km)
 %
 %           4.1 Thinning trend
-%               thinning = tephraFits(distance, thickness, {'exponential', 'powerlaw'}, 'deposit', 'transect', 'C', 20)
+%               thinning = tephraFits(distance, thickness, {'exponential', 'powerlaw'}, 'dataType', 'transect', 'C', 20)
 %
 %       5. FINING TREND (ISOPLETH)
 %           diameter    = [9,7,6,5];                                                    % Isopleth diameter (cm)
 %           area        = sqrt([1.6, 5.8, 10.0, 26.5]);                                 % Isopleth area (km)
 %
 %           5.1 Fining trend
-%               fining  = tephraFits(area, diameter, {'exponential', 'powerlaw'}, 'deposit', 'isopleth', 'C', 20)
+%               fining  = tephraFits(area, diameter, {'exponential', 'powerlaw'}, 'dataType', 'isopleth', 'C', 20)
 
 
 %% Check if the first two arguments are structures, in witch cases run the classification script
@@ -205,11 +205,11 @@ C.deposit       = 'isopach';
 C.runMode       = 'single';
 
 % Check deposit
-if ~isempty(findCell(varargin, 'deposit'))                                  
-    if isempty(findCell({'isopach', 'isomass', 'transect', 'isopleth'}, lower(varargin{findCell(varargin, 'deposit')+1})))
+if ~isempty(findCell(varargin, 'dataType'))                                  
+    if isempty(findCell({'isopach', 'isomass', 'transect', 'isopleth'}, lower(varargin{findCell(varargin, 'dataType')+1})))
         error('deposit accepts ''isopach'', ''isomass'', ''transect''or ''isopleth''');
     end
-    C.deposit = varargin{findCell(varargin, 'deposit')+1};
+    C.deposit = varargin{findCell(varargin, 'dataType')+1};
 end
 % Check yScale
 if ~isempty(findCell(varargin, 'yScale'))                               
@@ -218,7 +218,7 @@ if ~isempty(findCell(varargin, 'yScale'))
     end
     C.yScale = varargin{findCell(varargin, 'yScale')+1};
 else
-    C.yScale = 'ln';
+    C.yScale = 'log10';
 end
 % Check runMode
 if ~isempty(findCell(varargin, 'runMode'))                               
@@ -502,8 +502,8 @@ if strcmpi(fitType, 'exponential')
     if strcmpi(C.deposit, 'isopleth')
         % Half distance = log(2) / -k * sqrt(pi)
         out.bc      = -1*.391066419./out.k;      
-        out.HB      = (out.bc - (out.bc.*(out.bc + 4*.41*7.3)).^(1/2)).^2./(4*.41^2); % Height of neutral buoyancy, equation 11 of Pyle (1989)
-        out.HT      = out.HB/0.7; % Neutral buoyancy to plume height, Sparks (1986)
+        %out.HB      = (out.bc - (out.bc.*(out.bc + 4*.41*7.3)).^(1/2)).^2./(4*.41^2); % Height of neutral buoyancy, equation 11 of Pyle (1989)
+        %out.HT      = out.HB/0.7; % Neutral buoyancy to plume height, Sparks (1986)
     else
         out.bt      = -1*.391066419./out.k;
     end
@@ -563,8 +563,8 @@ if strcmpi(C.runMode, 'probabilistic')
         out.IP          = reshape(Vtmp.IP, size(Vtmp.FP,1),size(Vtmp.FP,3));
         if strcmpi(C.deposit, 'isopleth')
             out.bcP     = -1*.391066419./out.kP;
-            out.HBP     = (out.bcP - (out.bcP.*(out.bcP + 4*.41*7.3)).^(1/2)).^2./(4*.41^2); % Height of neutral buoyancy, equation 11 of Pyle (1989)
-            out.HTP     = out.HBP./0.7; % Neutral buoyancy to plume height, Sparks (1986)     
+            %out.HBP     = (out.bcP - (out.bcP.*(out.bcP + 4*.41*7.3)).^(1/2)).^2./(4*.41^2); % Height of neutral buoyancy, equation 11 of Pyle (1989)
+            %out.HTP     = out.HBP./0.7; % Neutral buoyancy to plume height, Sparks (1986)     
         else
             out.btP     = -1*.391066419./out.kP;
         end
@@ -1211,7 +1211,19 @@ elseif strcmpi(type, 'BonadonnaCosta13')
             plot( isopach.weibull.lambdaP(1,:), isopleth.weibull.lambdaP(1,:)/isopach.weibull.lambdaP(1,:), '.k')
         end
     end
-    plot( isopach.weibull.lambda(1), isopleth.weibull.lambda(1)/isopach.weibull.lambda(1),'ok', 'MarkerFaceColor','r')
+    
+   % lambdaThMin = ( (isopach.weibull.volume_km3 - .2*isopach.weibull.volume_km3) * 1e9/3e6)^(1/1.53);
+    
+   % volime %3?10l6?1:53
+    
+    x = isopach.weibull.lambda(1);
+    y = isopleth.weibull.lambda(1)/isopach.weibull.lambda(1);
+    
+    % Plot the 20% error defined in Bonadonna and Costa (2013)
+    plot([x,x], [y-.5*y, y+.5*y], '-', 'Color', [.8 .8 .8], 'LineWidth', 2);
+    plot([x-.3*x, x+.3*x], [y,y], '-', 'Color', [.8 .8 .8], 'LineWidth', 2);
+    
+    plot(x, y, 'ok', 'MarkerFaceColor','r')
 
 end
 
