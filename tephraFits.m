@@ -469,6 +469,7 @@ if ~strcmp(C.plotType, 'none')
         l2.Marker = 'x';
         
         title('V_P_L = f(C)')
+        grid on
     end
 end
 
@@ -499,13 +500,18 @@ if strcmpi(fitType, 'exponential')
     out.T0          = exp(Vtmp.F(:,1));
     out.k           = Vtmp.F(:,2);
     out.I           = Vtmp.I;
+    % Half y distance
+    % If x is square root of Area, the half y distance is calculated
+    % following Pyle (1989). If not (i.e. transect) the half y distance is
+    % calculated following Nathenson (2017)
     if strcmpi(C.deposit, 'isopleth')
-        % Half distance = log(2) / -k * sqrt(pi)
-        out.bc      = -1*.391066419./out.k;      
+        out.bc      = log(2)/sqrt(pi)./-out.k;
         %out.HB      = (out.bc - (out.bc.*(out.bc + 4*.41*7.3)).^(1/2)).^2./(4*.41^2); % Height of neutral buoyancy, equation 11 of Pyle (1989)
         %out.HT      = out.HB/0.7; % Neutral buoyancy to plume height, Sparks (1986)
+    elseif strcmpi(C.deposit, 'transect') 
+        out.bt     = log(2)./-out.k;
     else
-        out.bt      = -1*.391066419./out.k;
+        out.bt      = log(2)/sqrt(pi)./-out.k;
     end
 elseif strcmpi(fitType, 'powerlaw')
     out.m           = -1*Vtmp.F(2);
@@ -562,11 +568,13 @@ if strcmpi(C.runMode, 'probabilistic')
         out.kP          = reshape(Vtmp.FP(:,2,:), size(Vtmp.FP,1),size(Vtmp.FP,3));
         out.IP          = reshape(Vtmp.IP, size(Vtmp.FP,1),size(Vtmp.FP,3));
         if strcmpi(C.deposit, 'isopleth')
-            out.bcP     = -1*.391066419./out.kP;
+            out.bcP     = log(2)/sqrt(pi)./-out.kP;
             %out.HBP     = (out.bcP - (out.bcP.*(out.bcP + 4*.41*7.3)).^(1/2)).^2./(4*.41^2); % Height of neutral buoyancy, equation 11 of Pyle (1989)
             %out.HTP     = out.HBP./0.7; % Neutral buoyancy to plume height, Sparks (1986)     
+        elseif strcmpi(C.deposit, 'transect')
+            out.btP     = log(2)./-out.kP;
         else
-            out.btP     = -1*.391066419./out.kP;
+            out.btP     = log(2)/sqrt(pi)./-out.kP;
         end
     elseif strcmpi(fitType, 'powerlaw')
         out.mP          = -1.*reshape(Vtmp.FP(:,2,:), size(Vtmp.FP,1),size(Vtmp.FP,3));
@@ -799,8 +807,8 @@ if strcmpi(C.runMode, 'probabilistic')
     for i = 1:length(V.xData)
         xE = [V.xData(i)-V.xData(i).*C.xError(i)/100, V.xData(i)+V.xData(i).*C.xError(i)/100]; 
         yE = [ydata{1}(i)-ydata{1}(i).*C.yError(i)/100, ydata{1}(i)+ydata{1}(i).*C.yError(i)/100];
-        plot(xE, [ydata{1}(i),ydata{1}(i)], '-', 'Color', [.8 .8 .8], 'LineWidth', 2);
-        plot([V.xData(i),V.xData(i)], yE, '-', 'Color', [.8 .8 .8], 'LineWidth', 2);
+        plot(xE, [ydata{1}(i),ydata{1}(i)], '-', 'Color', [.2 .2 .2], 'LineWidth', 1);
+        plot([V.xData(i),V.xData(i)], yE, '-', 'Color', [.2 .2 .2], 'LineWidth', 1);
     end
 end
 
@@ -1220,8 +1228,8 @@ elseif strcmpi(type, 'BonadonnaCosta13')
     y = isopleth.weibull.lambda(1)/isopach.weibull.lambda(1);
     
     % Plot the 20% error defined in Bonadonna and Costa (2013)
-    plot([x,x], [y-.5*y, y+.5*y], '-', 'Color', [.8 .8 .8], 'LineWidth', 2);
-    plot([x-.3*x, x+.3*x], [y,y], '-', 'Color', [.8 .8 .8], 'LineWidth', 2);
+    plot([x,x], [y-.5*y, y+.5*y], '-', 'Color', [.2 .2 .2], 'LineWidth', 1);
+    plot([x-.3*x, x+.3*x], [y,y], '-', 'Color', [.2 .2 .2], 'LineWidth', 1);
     
     plot(x, y, 'ok', 'MarkerFaceColor','r')
 
