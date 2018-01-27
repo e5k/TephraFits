@@ -386,6 +386,37 @@ for iF = 1:length(fitType)
     V.(fitType{iF}) = prepareOutput(Vtmp, V,C,fitType{iF});
 end
 
+
+function fit_seg(x,y,varargin)
+if nargin == 2
+    minS = 2; % Min nb of segments
+    maxS = 4; % Max nb of segments
+else
+    minS = varargin{1};
+    maxS = varargin{2};
+end
+
+idx = (1:length(x))';
+
+for i = minS:maxS
+    if i-1 == 1
+        combs = idx;
+        combs = combs(combs>=2 & combs<=idx(end)-1);
+    elseif i-1 == 2
+        [ca, cb] = ndgrid(idx, idx);
+        combs = [ca(:), cb(:)];
+        combs = combs(combs(:,2) > combs(:,1) & combs(:,2)-combs(:,1)>1 & combs(:,1) >= 2 & combs(:,2) <=idx(end)-1, :);
+    elseif i-3 == 3
+        [ca, cb, cc] = ndgrid(idx, idx);
+        combs = [ca(:), cb(:), cc(:)];
+        a
+    end
+end
+
+
+
+
+
 %% Plots
 % Setup plot
 % Colormap
