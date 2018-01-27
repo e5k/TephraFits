@@ -234,7 +234,7 @@ if ~isempty(findCell(varargin, 'maxDistance'))
     C.maxDist = varargin{findCell(varargin, 'maxDistance')+1};  
 else
     C.maxDist = 1;                                % Defines the maximum extent of extrapolation in distal part. 1 means 100%, i.e. the distance to the most distal point is doubled
-    display(sprintf(' - No maximum interpolation was specified, using 100%% of the distance to the most distal value'))
+    fprintf(' - No maximum interpolation was specified, using 100%% of the distance to the most distal value')
 end
 % Check Fits to plot
 if ~isempty(findCell(varargin, 'fit2plot'))         
@@ -261,7 +261,7 @@ if strcmp(C.runMode, 'probabilistic')
         C.errorType = varargin{findCell(varargin, 'errorType')+1};
     else
         C.errorType     = 'normal';                         % Error envelop
-        display(sprintf(' - No error envelop was specified, using a normal distribution'))
+        fprintf(' - No error envelop was specified, using a normal distribution \n')
     end
     
     % Check xError and yError
@@ -301,7 +301,7 @@ if strcmp(C.runMode, 'probabilistic')
         end
     else
         C.errorBound = [5,95];
-        display(sprintf(' - No error bounds were specified, using the 5th and 95th percentiles'))
+        fprintf(' - No error bounds were specified, using the 5th and 95th percentiles\n')
     end
 end
 
@@ -317,9 +317,9 @@ end
 if ~isempty(findCell(fitType, 'exponential')) 
     % Check if break-in-slope is specified
     if isempty(findCell(varargin, 'BIS'));  V.fitProps.EXP_BIS = [];
-                                            display(sprintf(' - No break-in-slope index specified, using one exponential segment. Use ''BIS'' argument to specify the break-in-slope indices.'))
-    elseif length(varargin{findCell(varargin, 'BIS')+1}) > 2
-                                            error('Specify up to 3 segments');
+                                            fprintf(' - No break-in-slope index specified, using one exponential segment. Use ''BIS'' argument to specify the break-in-slope indices.\n')
+    elseif length(varargin{findCell(varargin, 'BIS')+1}) > 3
+                                            error('Specify up to 4 segments');
     else                                   
         V.fitProps.EXP_BIS = varargin{findCell(varargin, 'BIS')+1}; 
         % Check if more than one instance of the exponential fit is called
@@ -353,7 +353,7 @@ if ~isempty(findCell(fitType, 'weibull'))
                                             error('Specify both Weibull optimization ranges of lambda and n')
     % If the ranges are not directly specified but other fits are requested AND the deposit type is mass or volume
     elseif isempty(findCell(varargin, 'lambdaRange')) && length(fitType) > 1 && (strcmp(C.deposit, 'isopach') || strcmp(C.deposit, 'isomass'))
-                                            display(sprintf(' - No initial ranges of lambda/n specified for the Weibull optimization. Using the average volume of all other fits to estimate initial ranges.\n In case deposit was set to ''isomass'', conversion to volume using a density of 1000 kg/m3'))
+                                            fprintf(' - No initial ranges of lambda/n specified for the Weibull optimization. Using the average volume of all other fits to estimate initial ranges.\n In case deposit was set to ''isomass'', conversion to volume using a density of 1000 kg/m3\n')
     elseif strcmpi(C.deposit, 'isopleth') && (isempty(findCell(varargin, 'lambdaRange')) || isempty(findCell(varargin, 'nRange')))
                                             error('When deposit is set to ''isopleth'', both lambdaRange and nRange must be specified')
     else;                                   error('Initial ranges of lambda and n must be specified for the Weibull optimization with the arguments ''lambdaRange'' and ''nRange'' as a 1x2 vector containing [min, max]');
@@ -500,6 +500,7 @@ if strcmpi(fitType, 'exponential')
     out.T0          = exp(Vtmp.F(:,1));
     out.k           = Vtmp.F(:,2);
     out.I           = Vtmp.I;
+    out.Aip         = Vtmp.Aip;
     % Half y distance
     % If x is square root of Area, the half y distance is calculated
     % following Pyle (1989). If not (i.e. transect) the half y distance is
@@ -638,7 +639,7 @@ R = struct;
 % Deterministic approach
 if strcmpi(fitType, 'exponential')
     [R.F,R.X,R.Y,R.r2,R.I,R.Ym] = fitEXP(V.xData, V.yData, V.fitProps.EXP_BIS, C);
-    R.volume               = volEXP(exp(R.F(:,1)), R.F(:,2));
+    [R.volume, R.Aip]           = volEXP(exp(R.F(:,1)), R.F(:,2));
     
 elseif strcmpi(fitType, 'powerlaw')
     % Check T0
@@ -931,35 +932,53 @@ Y = [0 Y 100];
 yi = interp1(Y,x,p);
 
 %% EXPONENTIAL FUNCTIONS
-function V = volEXP(T0, k)
+function [V,A] = volEXP(T0, k)
 % Calculate the volume with the method of Fierstein and Nathenson (1992)
 % T0    Extrapolated thickness at A = 0 (cm)
 % k     Slope of the segment
-
+% 
 T0 = T0/10^5;
 
-% 1 segment
-if size(T0,1) == 1
-    % Equation (12) of Fierstein and Nathenson (1992) 
-    V = 2*(T0)/k^2;       
-end    
+% % 1 segment
+% if size(T0,1) == 1
+%     % Equation (12) of Fierstein and Nathenson (1992) 
+%     V = 2*(T0)/k^2;       
+% end    
+% 
+% % 2 segments
+% if size(T0,1) == 2
+%     A = (log(T0(2))-log(T0(1)))/(k(1)-k(2));
+%     k = -k;
+%     % Equation (18) of Fierstein and Nathenson (1992) 
+%     V = 2*T0(1)/k(1)^2 + 2*T0(1)*((k(2)*A+1)/k(2)^2 - (k(1)*A+1)/k(1)^2)*exp(-k(1)*A);                % Equation 18 of Fierstein and Nathenson (1992)
+% end
+% 
+% % 3 segments   
+% if size(T0,1) == 3
+%     A1 = (log(T0(2))-log(T0(1)))/(k(1)-k(2));
+%     A2 = (log(T0(3))-log(T0(2)))/(k(2)-k(3));
+%     k = -k;
+%     % Equation (3) of Bonadonna and Houghton (2005)
+%     V = 2*T0(1)/k(1)^2 + 2*T0(1)*((k(2)*A1+1)/k(2)^2 - (k(1)*A1+1)/k(1)^2)*exp(-k(1)*A1) + 2*T0(2)*((k(3)*A2+1)/k(3)^2 - (k(2)*A2+1)/k(2)^2)*exp(-k(2)*A2);
+% end
+% %k = -k;
 
-% 2 segments
-if size(T0,1) == 2
-    A = (log(T0(2))-log(T0(1)))/(k(1)-k(2));
-    k = -k;
-    % Equation (18) of Fierstein and Nathenson (1992) 
-    V = 2*T0(1)/k(1)^2 + 2*T0(1)*((k(2)*A+1)/k(2)^2 - (k(1)*A+1)/k(1)^2)*exp(-k(1)*A);                % Equation 18 of Fierstein and Nathenson (1992)
+Vseg = zeros(size(T0,1),1);
+A    = zeros(size(T0,1),1);
+for i = 1:size(T0,1)
+    if i == 1   % First segment
+        Vseg(i) = 2*(T0(i))/k(i)^2;
+    else
+        A(i)    = (log(T0(i))-log(T0(i-1)))/(k(i-1)-k(i));
+        k = -k;
+        Vseg(i) = 2*T0(i-1)*((k(i)*A(i)+1)  /k(i)^2 - (k(i-1)*A(i)+1)/k(i-1)^2)*exp(-k(i-1)*A(i));
+        k = -k;
+    end
 end
 
-% 3 segments   
-if size(T0,1) == 3
-    A1 = (log(T0(2))-log(T0(1)))/(k(1)-k(2));
-    A2 = (log(T0(3))-log(T0(2)))/(k(2)-k(3));
-    k = -k;
-    % Equation (3) of Bonadonna and Houghton (2005)
-    V = 2*T0(1)/k(1)^2 + 2*T0(1)*((k(2)*A1+1)/k(2)^2 - (k(1)*A1+1)/k(1)^2)*exp(-k(1)*A1) + 2*T0(2)*((k(3)*A2+1)/k(3)^2 - (k(2)*A2+1)/k(2)^2)*exp(-k(2)*A2);
-end
+V = sum(Vseg);
+
+
 
 function [F, X, Y, r2, I, Ym] = fitEXP(xdata, ydata, Aip, C)
 % EXPONENTIAL fit for volume calulation with the method of Fierstein and Nathenson (1992)
