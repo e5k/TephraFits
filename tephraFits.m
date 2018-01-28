@@ -57,7 +57,7 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %                       - 'isopach':    Calculates the tephra volume (km3) based on Ln(Thickness) vs. sqrt isopach area relationship (default)
 %                                       xData: square-root of isopach area (km)
 %                                       yData: isopach thickness (cm)
-%                       - 'isomass':       Calculates the tephra mass (kg) based on Ln(Mass accumulation) vs. sqrt isomass area relationship
+%                       - 'isomass':    Calculates the tephra mass (kg) based on Ln(Mass accumulation) vs. sqrt isomass area relationship
 %                                       xData: square-root of isomass area (km)
 %                                       yData: isomass accumulation (kg/m2)
 %                       - 'transect':   Thinning profile based on Ln(Thickness) vs. distance relationship
@@ -176,7 +176,7 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %               fining  = tephraFits(area, diameter, {'exponential', 'powerlaw'}, 'dataType', 'isopleth', 'C', 20)
 
 
-%% Check if the first two arguments are structures, in witch cases run the classification script
+%% Check if the first two arguments are structures, in witch case run the classification script
 if isstruct(xData) && isstruct(yData)
     getClassification(xData, yData);
     return
@@ -234,7 +234,7 @@ if ~isempty(findCell(varargin, 'maxDistance'))
     C.maxDist = varargin{findCell(varargin, 'maxDistance')+1};  
 else
     C.maxDist = 1;                                % Defines the maximum extent of extrapolation in distal part. 1 means 100%, i.e. the distance to the most distal point is doubled
-    fprintf(' - No maximum interpolation was specified, using 100%% of the distance to the most distal value')
+    fprintf(' - No maximum interpolation was specified, using 100%% of the distance to the most distal value\n')
 end
 % Check Fits to plot
 if ~isempty(findCell(varargin, 'fit2plot'))         
@@ -315,19 +315,49 @@ end
 
 % Check fit-dependant arguments
 if ~isempty(findCell(fitType, 'exponential')) 
-    % Check if break-in-slope is specified
-    if isempty(findCell(varargin, 'BIS'));  V.fitProps.EXP_BIS = [];
-                                            fprintf(' - No break-in-slope index specified, using one exponential segment. Use ''BIS'' argument to specify the break-in-slope indices.\n')
-    elseif length(varargin{findCell(varargin, 'BIS')+1}) > 3
-                                            error('Specify up to 4 segments');
-    else                                   
-        V.fitProps.EXP_BIS = varargin{findCell(varargin, 'BIS')+1}; 
-        % Check if more than one instance of the exponential fit is called
-        if ~isempty(V.fitProps.EXP_BIS) & length(findCell(fitType, 'exponential')) ~= size(V.fitProps.EXP_BIS)
-            error('Specify as many break-in-slopes as instances of the exponential segment');
+    
+    % If BIS is specified
+    if ~isempty(findCell(varargin, 'BIS'))
+        % Check if more than 3 break in slope
+        if length(varargin{findCell(varargin, 'BIS')+1}) > 3
+            error('Specify up to 4 segments');
         end
+        V.fitProps.EXP_BIS = varargin{findCell(varargin, 'BIS')+1};
+    
+    % New option to automatically assess the number of segments
+    elseif ~isempty(findCell(varargin, 'segments'))
+        % Check if more than two indices
+        if length(varargin{findCell(varargin, 'segments')+1}) > 2
+            error('Wrong number of segments');
+        elseif max(varargin{findCell(varargin, 'segments')+1}) > 4
+            error('Specify up to 4 segments');
+        end
+        V.fitProps.segments = varargin{findCell(varargin, 'segments')+1};
+    
+    else
+        V.fitProps.EXP_BIS = [];
+        fprintf(' - No break-in-slope index specified, using one exponential segment. Use ''BIS'' argument to specify the break-in-slope indices.\n')
+    
     end
-end    
+    
+
+%     % Check if break-in-slope is specified
+%     if isempty(findCell(varargin, 'BIS'));  V.fitProps.EXP_BIS = [];
+%                                             fprintf(' - No break-in-slope index specified, using one exponential segment. Use ''BIS'' argument to specify the break-in-slope indices.\n')
+%     elseif length(varargin{findCell(varargin, 'BIS')+1}) > 3
+%                                             error('Specify up to 4 segments');
+%     else                                   
+%         V.fitProps.EXP_BIS = varargin{findCell(varargin, 'BIS')+1}; 
+%         % Check if more than one instance of the exponential fit is called
+%         if ~isempty(V.fitProps.EXP_BIS) & length(findCell(fitType, 'exponential')) ~= size(V.fitProps.EXP_BIS)
+%             error('Specify as many break-in-slopes as instances of the exponential segment');
+%         end
+%     end
+    
+    
+end  
+
+
 if ~isempty(findCell(fitType, 'powerlaw'))
     % Check if distal integration limit is specified
     if isempty(findCell(varargin, 'C')) && (strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass'))
@@ -367,7 +397,20 @@ V.xData     = tmp(:,1);
 V.yData     = tmp(:,2);
 V.deposit   = C.deposit;
 
+% if exist('tmpSegments', 'var')
+%     fitSeg(xData, yData, tmpSegments);
+% end
+
+
 %% Run
+
+% Single run
+for iF = 1:length(fitType)
+    [Vtmp,V]        = fitMe(V,C,fitType{iF});
+    V.(fitType{iF}) = prepareOutput(Vtmp, V,C,fitType{iF});
+end
+
+
 % If probabilstic mode
 if strcmp(C.runMode, 'probabilistic')
     tmp      = [reshape(C.xError, length(C.xError), 1), reshape(C.yError, length(C.yError), 1)];
@@ -379,42 +422,6 @@ if strcmp(C.runMode, 'probabilistic')
         V.fitProps.PL_CP = randomize(V.fitProps.PL_C, C.CError, C.nbRuns, C.errorType);
     end
 end
-
-% Single run
-for iF = 1:length(fitType)
-    [Vtmp,V]        = fitMe(V,C,fitType{iF});
-    V.(fitType{iF}) = prepareOutput(Vtmp, V,C,fitType{iF});
-end
-
-
-function fit_seg(x,y,varargin)
-if nargin == 2
-    minS = 2; % Min nb of segments
-    maxS = 4; % Max nb of segments
-else
-    minS = varargin{1};
-    maxS = varargin{2};
-end
-
-idx = (1:length(x))';
-
-for i = minS:maxS
-    if i-1 == 1
-        combs = idx;
-        combs = combs(combs>=2 & combs<=idx(end)-1);
-    elseif i-1 == 2
-        [ca, cb] = ndgrid(idx, idx);
-        combs = [ca(:), cb(:)];
-        combs = combs(combs(:,2) > combs(:,1) & combs(:,2)-combs(:,1)>1 & combs(:,1) >= 2 & combs(:,2) <=idx(end)-1, :);
-    elseif i-3 == 3
-        [ca, cb, cc] = ndgrid(idx, idx);
-        combs = [ca(:), cb(:), cc(:)];
-        a
-    end
-end
-
-
-
 
 
 %% Plots
@@ -531,7 +538,6 @@ if strcmpi(fitType, 'exponential')
     out.T0          = exp(Vtmp.F(:,1));
     out.k           = Vtmp.F(:,2);
     out.I           = Vtmp.I;
-    out.Aip         = Vtmp.Aip;
     % Half y distance
     % If x is square root of Area, the half y distance is calculated
     % following Pyle (1989). If not (i.e. transect) the half y distance is
@@ -669,6 +675,13 @@ R = struct;
 
 % Deterministic approach
 if strcmpi(fitType, 'exponential')
+    
+    % Automatic definition of segments
+    if isfield(V.fitProps, 'segments')
+        V = fitSeg(V,C);
+    end
+    
+    
     [R.F,R.X,R.Y,R.r2,R.I,R.Ym] = fitEXP(V.xData, V.yData, V.fitProps.EXP_BIS, C);
     [R.volume, R.Aip]           = volEXP(exp(R.F(:,1)), R.F(:,2));
     
@@ -1009,8 +1022,6 @@ end
 
 V = sum(Vseg);
 
-
-
 function [F, X, Y, r2, I, Ym] = fitEXP(xdata, ydata, Aip, C)
 % EXPONENTIAL fit for volume calulation with the method of Fierstein and Nathenson (1992)
 % xdata: Square root of the area (km)
@@ -1097,6 +1108,75 @@ end
 X   = reshape(cell2mat(X'), size(cell2mat(X),1)*size(cell2mat(X),2), 1)';
 Y   = reshape(cell2mat(Y'), size(cell2mat(Y),1)*size(cell2mat(Y),2), 1)';
 Ym  = cell2mat(Ym)';
+
+function V = fitSeg(V,C)
+% Returns the combination of segments that minimises the RMSE
+
+if length(V.fitProps.segments) == 1
+    seg = [V.fitProps.segments, V.fitProps.segments];
+else
+    seg = V.fitProps.segments;
+end
+
+idx     = (1:length(V.xData))';
+seg     = seg(1):seg(2);
+combs   = cell(size(seg));
+
+for i = 1:length(seg) %seg(1):seg(2)
+    
+    if seg(i) == 1 % Test one segment
+        cmb = 0;
+        
+    elseif seg(i) == 2
+        cmb = idx;
+        cmb = cmb(cmb>=2 & cmb<=idx(end)-1);      
+    elseif seg(i) == 3
+        [ca, cb] = ndgrid(idx, idx);
+        cmb = [ca(:), cb(:)];
+        cmb = cmb(cmb(:,2) > cmb(:,1) & cmb(:,2)-cmb(:,1)>1 & cmb(:,1) >= 2 & cmb(:,2) <idx(end)-1, :);
+        
+    elseif seg(i) == 4
+        [ca, cb, cc] = ndgrid(idx, idx, idx);
+        cmb  = [ca(:), cb(:), cc(:)];
+        idx1 = cmb(:,2) > cmb(:,1) & cmb(:,2)-cmb(:,1)>1 & cmb(:,1) >= 2 & cmb(:,2) <idx(end)-1;
+        idx2 = cmb(:,2) - cmb(:,1) >= 2 & cmb(:,3) - cmb(:,2) >= 2 ;        
+        cmb  = cmb(logical(idx1.*idx2),:);       
+        
+    end
+    
+    % If comb is returned empty, return an error
+    if isempty(cmb)
+        error(['No solution found for ', num2str(seg(i)), ' segments']);
+    else
+        combs{i} = cmb;
+    end
+end
+
+rmse = struct;
+for i = 1:length(combs)
+    for j = 1:length(combs{i})
+        if combs{i}(j,:) == 0 % if one segment
+            [F,~,~,~,~,Ym] = fitEXP(V.xData, V.yData, [], C);
+        else
+            [F,~,~,~,~,Ym] = fitEXP(V.xData, V.yData, combs{i}(j,:), C);
+        end
+        
+        if i == 1 && j == 1
+            rmse.seg  = combs{i}(j,:);
+            rmse.rmse = sum(((V.yData-Ym').^2)./numel(Ym)); % Calculate rmse
+        else
+            % Check that the ordinates and slopes of all segments decrease
+            if nnz(F(2:end,1)-F(1:end-1,1)>0) == 0 && nnz(F(2:end,2)-F(1:end-1,2)<0) == 0 
+                rmseT = sum(((V.yData-Ym').^2)./numel(Ym));
+                if rmseT < rmse.rmse
+                    rmse.seg  = combs{i}(j,:);
+                    rmse.rmse = rmseT;
+                end
+            end
+        end
+    end
+end
+V.fitProps.EXP_BIS = rmse.seg;
 
 %% POWER-LAW FUNCTIONS
 function V = volPL(T0, m, Tpl, C)
