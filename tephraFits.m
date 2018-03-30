@@ -12,7 +12,8 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %       Multiple fits can be specified in a cell array (Ex. {'exponential','powerlaw'})
 %
 %   Fit-specific input arguments:
-%       Exponential: 0 or 1 arguments
+%       Exponential:
+%       - To manually specify breaks-in-slopes:
 %           - 'BIS': 
 %           - Fit thickness data with 1 exponential segment:
 %               vExp = tephraFits(thickness, area, 'exponential', 'isopach') 
@@ -27,6 +28,17 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %           decreasing thickness):
 %               vExp = tephraFits(thickness, area, 'exponential', 'isopach', [3,6])
 %
+%       - To search the best absolute fit with various segments:
+%            - 'segments':
+%            - Specify the range of segments to fit by minimizing the root
+%              mean square error. Fit between 2 and 4 exponential segments:
+%               vExp = tephraFits(thickness, area, 'exponential', 'segments', [2,4])
+%              
+%            - 'optimize' (optional):
+%            - Choose the optimization method, either by minimizing the root mean square
+%              error ('rse', default) or maximising the r-square ('r2')
+%               vExp = tephraFits(thickness, area, 'exponential', 'segments', [2,4], 'optimize', 'r2')
+%
 %       Power-law: 2 arguments
 %           tephraFits(thickness, area, 'powerlaw', 'isopach', C, T0)
 %           	C:  Distal integration limit (km)
@@ -34,12 +46,12 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %           Examples:
 %           - Fit thickness data with a Power-Law up to 300 km and using 
 %           the T0 from a 1-exponential segment approach:
-%               vPL = tephraFits(thickness, area, 'powerlaw', 'isopach', 300, vExp.T0)
+%               vPL = tephraFits(thickness, area, 'powerlaw', 'isopach', 'C', 300, vExp.T0)
 %
 %           - Fit thickness data with a Power-Law up to 100 km and using 
 %           the T0 from the proximal segment of a multiple exponential 
 %           segment approach:
-%               vPL = tephraFits(thickness, area, 'powerlaw', 'isopach', 100, vExp.T0(1))
+%               vPL = tephraFits(thickness, area, 'powerlaw', 'isopach', 'C', 100, vExp.T0(1))
 %
 %       Weibull: 1 or 2 arguments
 %           Examples:
@@ -323,6 +335,11 @@ if ~isempty(findCell(fitType, 'exponential'))
             error('Specify up to 4 segments');
         end
         V.fitProps.EXP_BIS = varargin{findCell(varargin, 'BIS')+1};
+        
+        % If the break in slope is empty, change its value to 0
+        if isempty(V.fitProps.EXP_BIS)
+            V.fitProps.EXP_BIS = 0;
+        end
     
     % New option to automatically assess the number of segments
     elseif ~isempty(findCell(varargin, 'segments'))
@@ -333,28 +350,18 @@ if ~isempty(findCell(fitType, 'exponential'))
             error('Specify up to 4 segments');
         end
         V.fitProps.segments = varargin{findCell(varargin, 'segments')+1};
-    
+        
+        if ~isempty(findCell(varargin, 'optimize'))
+            V.fitProps.optMeth = varargin{findCell(varargin, 'optimize')+1};
+        else
+            V.fitProps.optMeth = 'rsq';
+            fprintf(' - No optimizing method specified, using r2. Use ''optimize'' argument to specify a method.\n')
+        end
     else
         V.fitProps.EXP_BIS = [];
         fprintf(' - No break-in-slope index specified, using one exponential segment. Use ''BIS'' argument to specify the break-in-slope indices.\n')
     
     end
-    
-
-%     % Check if break-in-slope is specified
-%     if isempty(findCell(varargin, 'BIS'));  V.fitProps.EXP_BIS = [];
-%                                             fprintf(' - No break-in-slope index specified, using one exponential segment. Use ''BIS'' argument to specify the break-in-slope indices.\n')
-%     elseif length(varargin{findCell(varargin, 'BIS')+1}) > 3
-%                                             error('Specify up to 4 segments');
-%     else                                   
-%         V.fitProps.EXP_BIS = varargin{findCell(varargin, 'BIS')+1}; 
-%         % Check if more than one instance of the exponential fit is called
-%         if ~isempty(V.fitProps.EXP_BIS) & length(findCell(fitType, 'exponential')) ~= size(V.fitProps.EXP_BIS)
-%             error('Specify as many break-in-slopes as instances of the exponential segment');
-%         end
-%     end
-    
-    
 end  
 
 
@@ -363,7 +370,11 @@ if ~isempty(findCell(fitType, 'powerlaw'))
     if isempty(findCell(varargin, 'C')) && (strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass'))
                                             error('The power-law method requires to provide the distal integration limit (i.e. argument C)')
     elseif strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass')
+        if varargin{findCell(varargin, 'C')+1} < sqrt(xData(end))
+            error('The distal integration limit is smaller than the area of the most dital contour')
+        else
                                             V.fitProps.PL_C = varargin{findCell(varargin, 'C')+1}; 
+        end
     else;                                   V.fitProps.PL_C = 100;  % In case deposit is 'isopleth', set an arbitrary distal integration limit
     end
     
@@ -680,8 +691,7 @@ if strcmpi(fitType, 'exponential')
     if isfield(V.fitProps, 'segments')
         V = fitSeg(V,C);
     end
-    
-    
+
     [R.F,R.X,R.Y,R.r2,R.I,R.Ym] = fitEXP(V.xData, V.yData, V.fitProps.EXP_BIS, C);
     [R.volume, R.Aip]           = volEXP(exp(R.F(:,1)), R.F(:,2));
     
@@ -690,13 +700,13 @@ elseif strcmpi(fitType, 'powerlaw')
     if isfield(V.fitProps, 'PL_T0');    T0 = V.fitProps.PL_T0;
     else;                               T0 = V.exponential.T0(1);          % Here I take the T0 from the proximal segment
     end
-    [R.F,R.X,R.Y,R.r2,R.Ym]     = fitPL(V.xData, V.yData, T0, C);    
+    [R.F,R.X,R.Y,R.r2,R.Ym]     = fitPL(V.xData, V.yData, C);    
     R.volume                    = volPL(T0, -1*R.F(2), 10^R.F(1), V.fitProps.PL_C);
     
     % Define a range of C values and calculate the volume
     R.C.range                   = logspace(floor(log10(V.fitProps.PL_C)), ceil(log10(V.fitProps.PL_C)), 20);
     for iv = 1:length(R.C.range)
-        tmpF                    = fitPL(V.xData, V.yData, T0, C); 
+        tmpF                    = fitPL(V.xData, V.yData, C); 
         R.C.volume(iv)          = volPL(T0, -1*tmpF(2), 10^tmpF(1), R.C.range(iv));
     end
     
@@ -737,7 +747,7 @@ if strcmp(C.runMode, 'probabilistic')
             else;                               T0 = V.exponential.T0P(1,:);
             end     
             [R.FP(:,:,iR), R.XP(:,:,iR), R.YP(:,:,iR), R.r2P(:,:,iR), R.YmP(:,:,iR)]  =...
-                fitPL(V.xDataP(:,:,iR), V.yDataP(:,:,iR), T0(iR), C);
+                fitPL(V.xDataP(:,:,iR), V.yDataP(:,:,iR), C);
             R.volumeP(iR) = volPL(T0(iR), -1*R.FP(:,2,iR), 10^R.FP(:,1,iR), V.fitProps.PL_CP(iR));
             
         elseif strcmpi(fitType, 'weibull')
@@ -885,7 +895,11 @@ for iF = 1:length(fitType)
             plot(ax, xP(:,2), yP(:,2), ':', 'LineWidth',.5, 'Color', cmap(iF,:));
     end
     
-    h(iF+1) = plot(ax, V.(fitType{iF}).X, ydata{iF,2}, '-', 'LineWidth',1, 'Color', cmap(iF,:));  % Plot curve  
+    if      strcmpi(fitType{iF}, 'exponential')
+        h(iF+1) = plot(ax, V.(fitType{iF}).X, ydata{iF,2}, '-', 'Marker', '.', 'LineWidth',1, 'Color', cmap(iF,:));  % Plot curve  
+    else
+        h(iF+1) = plot(ax, V.(fitType{iF}).X, ydata{iF,2}, '-', 'LineWidth',1, 'Color', cmap(iF,:));  % Plot curve  
+    end
     l{iF+1} = fitType{iF};
 end
 
@@ -1031,7 +1045,7 @@ function [F, X, Y, r2, I, Ym] = fitEXP(xdata, ydata, Aip, C)
 ydata = log(ydata);
 
 % Define segment indices
-if isempty(Aip) %length(Aip) == 1 && Aip == 0         % One segment
+if Aip == 0 %isempty(Aip) %length(Aip) == 1 && Aip == 0         % One segment
     idx     = [1, length(xdata)];
 else                                    % Multiple segments
     idx     = zeros(length(Aip)+2,1);
@@ -1054,7 +1068,11 @@ for i = 1:length(idx)-1
 %         idxS = idx(i)+1;        % In case there are multiple segments, this ensures that the same point is not used twice to define the fit.
 %     end
     idxS    = idx(i);
-    idxE    = idx(i+1);
+    if i == length(idx)-1
+        idxE = idx(end);
+    else
+        idxE    = idx(i+1);
+    end
     
     % Fit data
     N       = size(xdata(idxS:idxE),1);
@@ -1070,7 +1088,7 @@ r2  = zeros(length(idx)-1,1); % R-square
 %Xt  = 0:1:1000;
 
 % 1 segment
-if isempty(Aip)
+if Aip == 0 %isempty(Aip)
     X{1} = [0, xdata(end) + xdata(end)*C.maxDist];
     Y{1} = exp(F(1,1)).*exp(F(1,2).*X{1});
     Ym{1}= exp(F(1,1)).*exp(F(1,2).*xdata);
@@ -1146,31 +1164,59 @@ for i = 1:length(seg) %seg(1):seg(2)
     
     % If comb is returned empty, return an error
     if isempty(cmb)
-        error(['No solution found for ', num2str(seg(i)), ' segments']);
+        warning(['No solution found for ', num2str(seg(i)), ' segments']);
     else
         combs{i} = cmb;
     end
 end
 
+combs(cellfun(@isempty, combs)) = [];
+
+
 rmse = struct;
+% Check rsq vs rmse
+if strcmp(V.fitProps.optMeth, 'rsq')
+    rmse.rmse = 0;
+else
+    rmse.rmse = 1e6;
+end
+rmse.seg = [];
 for i = 1:length(combs)
     for j = 1:length(combs{i})
         if combs{i}(j,:) == 0 % if one segment
-            [F,~,~,~,~,Ym] = fitEXP(V.xData, V.yData, [], C);
+            [F,X,~,~,I,Ym] = fitEXP(V.xData, V.yData, 0, C);
         else
-            [F,~,~,~,~,Ym] = fitEXP(V.xData, V.yData, combs{i}(j,:), C);
+            [F,X,~,~,I,Ym] = fitEXP(V.xData, V.yData, combs{i}(j,:), C);
         end
         
-        if i == 1 && j == 1
-            rmse.seg  = combs{i}(j,:);
-            rmse.rmse = sum(((V.yData-Ym').^2)./numel(Ym)); % Calculate rmse
-        else
-            % Check that the ordinates and slopes of all segments decrease
-            if nnz(F(2:end,1)-F(1:end-1,1)>0) == 0 && nnz(F(2:end,2)-F(1:end-1,2)<0) == 0 
-                rmseT = sum(((V.yData-Ym').^2)./numel(Ym));
-                if rmseT < rmse.rmse
-                    rmse.seg  = combs{i}(j,:);
-                    rmse.rmse = rmseT;
+        % Check that the ordinates and slopes of all segments decrease
+        % The first 2 arguments ensure that the exonential segments are
+        % decreasing. The third argument is to avoid the minimization to
+        % obtain unrealistic fits, i.e. case figure where break-in-slopes
+        % do not correspond to original BIS
+        if issorted(flipud(F(:,1))) && issorted(F(:,2)) && issorted(X)%nnz(F(2:end,1)-F(1:end-1,1)>0) > 0 || nnz(F(2:end,2)-F(1:end-1,2)<0) > 0
+            rmse.I = I;
+            
+            
+            % Test if fits make sense
+            for k = 1:length(combs{i}(j,:))
+                if combs{i}(j,:) == 0 | (I(k) > V.xData(combs{i}(j,k)) && I(k) < V.xData(combs{i}(j,k)+1))
+                    % Maximise r2
+                    if strcmp(V.fitProps.optMeth, 'rsq')
+                        rmseT = rsquare(V.yData, Ym');
+                        if rmseT > rmse.rmse
+                            rmse.seg  = combs{i}(j,:);
+                            rmse.rmse = rmseT;
+                        end
+                        
+                        % Minimise rmse
+                    else
+                        rmseT = sum(((V.yData-Ym').^2)./numel(Ym));
+                        if rmseT < rmse.rmse
+                            rmse.seg  = combs{i}(j,:);
+                            rmse.rmse = rmseT;
+                        end
+                    end
                 end
             end
         end
@@ -1194,7 +1240,7 @@ Tpl   = Tpl/10^5;
 B = ((T0/Tpl)^(-1/m));
 V = (2*Tpl/(2-m)) * (C^(2-m) - B^(2-m));       
 
-function [F, X, Y, r2, Ym] = fitPL(xdata, ydata, T0, C)
+function [F, X, Y, r2, Ym] = fitPL(xdata, ydata, C)
 % POWER-LAW fits for volume calulation with the method of Bonadonna and Houghton (2005)
 % Note that we use here the commonly used approximation of an exponential
 % fit of log10(x), log10(y) to approximate a power-law
