@@ -358,7 +358,7 @@ if ~isempty(findCell(fitType, 'exponential'))
             fprintf(' - No optimizing method specified, using r2. Use ''optimize'' argument to specify a method.\n')
         end
     else
-        V.fitProps.EXP_BIS = [];
+        V.fitProps.EXP_BIS = 0;
         fprintf(' - No break-in-slope index specified, using one exponential segment. Use ''BIS'' argument to specify the break-in-slope indices.\n')
     
     end
@@ -378,7 +378,7 @@ if ~isempty(findCell(fitType, 'powerlaw'))
     else;                                   V.fitProps.PL_C = 100;  % In case deposit is 'isopleth', set an arbitrary distal integration limit
     end
     
-    % Check if distal integration limit is specified -> double check if the T0 should be specified in ln !!!!!!!
+    % Check if distal integration limit is specified
     if isempty(findCell(fitType, 'exponential')) && isempty(findCell(varargin, 'T0'))
                                             error('The power-law method requires the y intersect from the exponential value. Either add ''exponential'' to the fit type or specify a ''T0'' argument (in the natural logarithm of the y axis value)')
     elseif ~isempty(findCell(varargin, 'T0'))
@@ -415,12 +415,9 @@ V.deposit   = C.deposit;
 
 %% Run
 
-% Single run
-for iF = 1:length(fitType)
-    [Vtmp,V]        = fitMe(V,C,fitType{iF});
-    V.(fitType{iF}) = prepareOutput(Vtmp, V,C,fitType{iF});
+if isfield(V.fitProps, 'segments')
+    V = fitSeg(V,C);
 end
-
 
 % If probabilstic mode
 if strcmp(C.runMode, 'probabilistic')
@@ -434,6 +431,11 @@ if strcmp(C.runMode, 'probabilistic')
     end
 end
 
+% Main fit
+for iF = 1:length(fitType)
+    [Vtmp,V]        = fitMe(V,C,fitType{iF});
+    V.(fitType{iF}) = prepareOutput(Vtmp, V,C,fitType{iF});
+end
 
 %% Plots
 % Setup plot
@@ -685,56 +687,50 @@ function [R,V] = fitMe(V,C,fitType)
 R = struct;
 
 % Deterministic approach
-if strcmpi(fitType, 'exponential')
-    
-    % Automatic definition of segments
-    if isfield(V.fitProps, 'segments')
-        V = fitSeg(V,C);
-    end
+    if strcmpi(fitType, 'exponential')
+        [R.F,R.X,R.Y,R.r2,R.I,R.Ym] = fitEXP(V.xData, V.yData, V.fitProps.EXP_BIS, C);
+        [R.volume, R.Aip]           = volEXP(exp(R.F(:,1)), R.F(:,2));
 
-    [R.F,R.X,R.Y,R.r2,R.I,R.Ym] = fitEXP(V.xData, V.yData, V.fitProps.EXP_BIS, C);
-    [R.volume, R.Aip]           = volEXP(exp(R.F(:,1)), R.F(:,2));
-    
-elseif strcmpi(fitType, 'powerlaw')
-    % Check T0
-    if isfield(V.fitProps, 'PL_T0');    T0 = V.fitProps.PL_T0;
-    else;                               T0 = V.exponential.T0(1);          % Here I take the T0 from the proximal segment
-    end
-    [R.F,R.X,R.Y,R.r2,R.Ym]     = fitPL(V.xData, V.yData, C);    
-    R.volume                    = volPL(T0, -1*R.F(2), 10^R.F(1), V.fitProps.PL_C);
-    
-    % Define a range of C values and calculate the volume
-    R.C.range                   = logspace(floor(log10(V.fitProps.PL_C)), ceil(log10(V.fitProps.PL_C)), 20);
-    for iv = 1:length(R.C.range)
-        tmpF                    = fitPL(V.xData, V.yData, C); 
-        R.C.volume(iv)          = volPL(T0, -1*tmpF(2), 10^tmpF(1), R.C.range(iv));
-    end
-    
-elseif strcmpi(fitType, 'weibull')
-    % If optimization ranges are not defined, use volume
-    if ~isfield(V.fitProps, 'WBL_lambdaRange') && ~strcmp(C.deposit, 'isopleth') 
-        tmp = [];
-        if isfield(V.('exponential'), 'volume_km3')
-            tmp(length(tmp)+1) = V.exponential.volume_km3;
-        elseif isfield(V.('exponential'), 'mass_kg')
-            tmp(length(tmp)+1) = V.exponential.mass_kg/1e3;                    % Conversion from mass to volume using density of 1000 kg/m3
+    elseif strcmpi(fitType, 'powerlaw')
+        % Check T0
+        if isfield(V.fitProps, 'PL_T0');    T0 = V.fitProps.PL_T0;
+        else;                               T0 = V.exponential.T0(1);          % Here I take the T0 from the proximal segment
         end
-        if isfield(V.('powerlaw'), 'volume_km3')
-            tmp(length(tmp)+1) = V.powerlaw.volume_km3;
-        elseif isfield(V.('powerlaw'), 'mass_kg')
-            tmp(length(tmp)+1) = V.powerlaw.mass_kg/1e3;                    % Conversion from mass to volume using density of 1000 kg/m3
+        [R.F,R.X,R.Y,R.r2,R.Ym]     = fitPL(V.xData, V.yData, C);    
+        R.volume                    = volPL(T0, -1*R.F(2), 10^R.F(1), V.fitProps.PL_C);
+
+        % Define a range of C values and calculate the volume
+        R.C.range                   = logspace(floor(log10(V.fitProps.PL_C)), ceil(log10(V.fitProps.PL_C)), 20);
+        for iv = 1:length(R.C.range)
+            tmpF                    = fitPL(V.xData, V.yData, C); 
+            R.C.volume(iv)          = volPL(T0, -1*tmpF(2), 10^tmpF(1), R.C.range(iv));
         end
-        [V.fitProps.WBL_lambdaRange, V.fitProps.WBL_nRange] = get_WBL_ranges(mean(tmp));
-    end       
-    [R.F,R.X,R.Y,R.r2,R.Ym]     = fitWBL(V.xData, V.yData, V.fitProps.WBL_lambdaRange, V.fitProps.WBL_nRange, C);
-    R.volume               = volWBL(R.F(1), R.F(2), R.F(3));
-end
+
+    elseif strcmpi(fitType, 'weibull')
+        % If optimization ranges are not defined, use volume
+        if ~isfield(V.fitProps, 'WBL_lambdaRange') && ~strcmp(C.deposit, 'isopleth') 
+            tmp = [];
+            if isfield(V.('exponential'), 'volume_km3')
+                tmp(length(tmp)+1) = V.exponential.volume_km3;
+            elseif isfield(V.('exponential'), 'mass_kg')
+                tmp(length(tmp)+1) = V.exponential.mass_kg/1e3;                    % Conversion from mass to volume using density of 1000 kg/m3
+            end
+            if isfield(V.('powerlaw'), 'volume_km3')
+                tmp(length(tmp)+1) = V.powerlaw.volume_km3;
+            elseif isfield(V.('powerlaw'), 'mass_kg')
+                tmp(length(tmp)+1) = V.powerlaw.mass_kg/1e3;                    % Conversion from mass to volume using density of 1000 kg/m3
+            end
+            [V.fitProps.WBL_lambdaRange, V.fitProps.WBL_nRange] = get_WBL_ranges(mean(tmp));
+        end       
+        [R.F,R.X,R.Y,R.r2,R.Ym]     = fitWBL(V.xData, V.yData, V.fitProps.WBL_lambdaRange, V.fitProps.WBL_nRange, C);
+        R.volume               = volWBL(R.F(1), R.F(2), R.F(3));
+    end
 
 % Probabilistic approach
 %fprintf(1,'\n');
 disp(['Fitting ', fitType]);
 waittext(0,'init');
-if strcmp(C.runMode, 'probabilistic')
+if strcmpi(C.runMode, 'probabilistic')
     for iR = 1:C.nbRuns
         waittext(iR/C.nbRuns, 'fraction');
         if strcmpi(fitType, 'exponential')
@@ -997,30 +993,6 @@ function [V,A] = volEXP(T0, k)
 % 
 T0 = T0/10^5;
 
-% % 1 segment
-% if size(T0,1) == 1
-%     % Equation (12) of Fierstein and Nathenson (1992) 
-%     V = 2*(T0)/k^2;       
-% end    
-% 
-% % 2 segments
-% if size(T0,1) == 2
-%     A = (log(T0(2))-log(T0(1)))/(k(1)-k(2));
-%     k = -k;
-%     % Equation (18) of Fierstein and Nathenson (1992) 
-%     V = 2*T0(1)/k(1)^2 + 2*T0(1)*((k(2)*A+1)/k(2)^2 - (k(1)*A+1)/k(1)^2)*exp(-k(1)*A);                % Equation 18 of Fierstein and Nathenson (1992)
-% end
-% 
-% % 3 segments   
-% if size(T0,1) == 3
-%     A1 = (log(T0(2))-log(T0(1)))/(k(1)-k(2));
-%     A2 = (log(T0(3))-log(T0(2)))/(k(2)-k(3));
-%     k = -k;
-%     % Equation (3) of Bonadonna and Houghton (2005)
-%     V = 2*T0(1)/k(1)^2 + 2*T0(1)*((k(2)*A1+1)/k(2)^2 - (k(1)*A1+1)/k(1)^2)*exp(-k(1)*A1) + 2*T0(2)*((k(3)*A2+1)/k(3)^2 - (k(2)*A2+1)/k(2)^2)*exp(-k(2)*A2);
-% end
-% %k = -k;
-
 Vseg = zeros(size(T0,1),1);
 A    = zeros(size(T0,1),1);
 for i = 1:size(T0,1)
@@ -1181,8 +1153,8 @@ else
     rmse.rmse = 1e6;
 end
 rmse.seg = [];
-for i = 1:length(combs)
-    for j = 1:length(combs{i})
+for i = 1:size(combs,2)
+    for j = 1:size(combs{i},1)
         if combs{i}(j,:) == 0 % if one segment
             [F,X,~,~,I,Ym] = fitEXP(V.xData, V.yData, 0, C);
         else
