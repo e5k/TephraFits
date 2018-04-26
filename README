@@ -2,14 +2,11 @@ This Matlab function helps describing the geometry of tephra deposits from field
 data and calculating key physical and empirical parameters to characterize fallout 
 deposits.
 
-A manuscript describing the function is submitted as a "How-To" paper in the journal
-Statistics in Volcanology. Visit https://e5k.github.io/ for the latest updates.
-
 TephraFits is released under a GPL3 license, which means that everybody should 
 feel free to contribute, comment, suggest and modify the code for as long as any 
 new update remains open-source. A copy of the complete license comes with this function.
 
-The GPL3 License covers TephraFits. The authors of dependencies used in this function
+The GPL3 License covers tephraFits. The authors of dependencies used in this function
 retain the copyright to their works. In particular, I am grateful to:
 - J. Landsey for the function bplot
 - J. D'Errico for the function fminsearchbnd
@@ -20,4 +17,4 @@ Don't hesitate to contact me by email should you have a suggestion or find a bug
 
 Hope this code will help!
 
-Copyright Seb Biass (sbiasse@hawaii.edu) - 2017
+Copyright Seb Biass (sbiasse AT ntu.edu.sg) - 2018

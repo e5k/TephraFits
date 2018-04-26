@@ -1,6 +1,6 @@
 % This is a demo run for TephraFits
 % For help about the function, type:
-% >> 
+% >> help tephraFits
 
 %% Example 1: Isopach
 clear;

@@ -3,68 +3,49 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %   V = tephraFits(xdata, ydata, method, deposit, ...) returns a structure
 %   containing the volume [km3] (or mass [kg]), fit details and VEI.
 %
-%   Required input arguments:
-%       xdata:   Square-root of isopach area (km) or distance from the vent (km)
-%       ydata:   Thickness (cm) or mass load (g/m2)
-%       fitType: 'exponential'   (Pyle 1989, Fierstein & Nathenson 1992)
-%                'powerlaw'      (Bonadonna & Houghton 2005)
-%                'weibull'       (Bonadonna & Costa 2012)
-%       Multiple fits can be specified in a cell array (Ex. {'exponential','powerlaw'})
+% ______________________________________________________________________________________________________________________________________________________________
+%% Required input arguments:
+%       xdata:          Square-root of isopach area (km) or distance from the vent (km)
+%       ydata:          Isopach thickness (cm), isomass load (kg/m2), isopleth diameter (cm), transect thickness (cm)
+%       fitType:        'exponential'   (Pyle 1989, Fierstein & Nathenson 1992, Bonadonna & Houghton 2005)
+%                       'powerlaw'      (Bonadonna & Houghton 2005)
+%                       'weibull'       (Bonadonna & Costa 2012)
+%                       Multiple fits can be specified in a cell array (Ex. {'exponential','powerlaw'})
+% ______________________________________________________________________________________________________________________________________________________________
+%% Fit-specific input arguments:
+%       'dataType':     Type of deposit to fit accepts 'isopach' (default), 
+%                       'isomass', 'isopleth', 'transect' 
 %
-%   Fit-specific input arguments:
-%       Exponential:
-%       - To manually specify breaks-in-slopes:
-%           - 'BIS': 
-%           - Fit thickness data with 1 exponential segment:
-%               vExp = tephraFits(thickness, area, 'exponential', 'isopach') 
+%  Exponential:
+%       'BIS':          Defines breaks-in-slopes for multiple exponential segments. If not specified, fits one segment (default).
+%                           - Fit thickness data with 1 exponential segment:
+%                               tephraFits(thickness, area, 'exponential') 
+%                           - Fit thickness data with 2 exponential segments, where the  break in slope is located between the 3rd and 4th points (in decreasing thickness):
+%                               tephraFits(thickness, area, 'exponential', 'BIS', 3) 
+%                           - Fit thickness data with 3 exponential segments, where the break in slope are located after the 3rd and 6th points (in decreasing thickness):
+%                               tephraFits(thickness, area, 'exponential', 'BIS', [3,6])
 %
-%           - Fit thickness data with 2 exponential segments, where the
-%           break in slope is located between the 3rd and 4th points (in
-%           decreasing thickness):
-%               vExp = TEPHRAFITS(thickness, area, 'exponential', 'isopach', 3) 
-%
-%           - Fit thickness data with 3 exponential segments, where the
-%           break in slope are located after the 3rd and 6th points (in
-%           decreasing thickness):
-%               vExp = tephraFits(thickness, area, 'exponential', 'isopach', [3,6])
-%
-%       - To search the best absolute fit with various segments:
-%            - 'segments':
-%            - Specify the range of segments to fit by minimizing the root
-%              mean square error. Fit between 2 and 4 exponential segments:
-%               vExp = tephraFits(thickness, area, 'exponential', 'segments', [2,4])
+%      'segments':      Search the best combination of segments. Specified as a vector containing the min and max number of vectors
+%                           - Fit between 2 and 4 exponential segments:
+%                               tephraFits(thickness, area, 'exponential', 'segments', [2,4])
 %              
-%            - 'optimize' (optional):
-%            - Choose the optimization method, either by minimizing the root mean square
-%              error ('rse', default) or maximising the r-square ('r2')
-%               vExp = tephraFits(thickness, area, 'exponential', 'segments', [2,4], 'optimize', 'r2')
+%       'optimize':     Optional, used along 'segments', choose the optimization method, either by minimizing the root mean square error ('rse', default) 
+%                       or maximising the r-square ('r2')
+%                               tephraFits(thickness, area, 'exponential', 'segments', [2,4], 'optimize', 'r2')
 %
-%       Power-law: 2 arguments
-%           tephraFits(thickness, area, 'powerlaw', 'isopach', C, T0)
-%           	C:  Distal integration limit (km)
-%               T0: Intersection of the proximal exponential segment
-%           Examples:
-%           - Fit thickness data with a Power-Law up to 300 km and using 
-%           the T0 from a 1-exponential segment approach:
-%               vPL = tephraFits(thickness, area, 'powerlaw', 'isopach', 'C', 300, vExp.T0)
-%
-%           - Fit thickness data with a Power-Law up to 100 km and using 
-%           the T0 from the proximal segment of a multiple exponential 
-%           segment approach:
-%               vPL = tephraFits(thickness, area, 'powerlaw', 'isopach', 'C', 100, vExp.T0(1))
-%
-%       Weibull: 1 or 2 arguments
-%           Examples:
-%           - Fit thickness data with a Weibull function using the volume
-%           (km3) obtained with a power-law to constrain the optimization 
-%            ranges of the lambda and n parameters:
-%               vWBL = tephraFits(thickness, area, 'weibull', 'isopach', vPL.volume_km3)
-%
-%           - Fit thickness data with a Weibull function manually specifying
-%           the optimization ranges of the lambda and n parameters:
-%               vWBL = tephraFits(thickness, area, 'weibull', 'isopach', lambdaRange, [0.1, 1000], nRange, [0.1, 1000])
-%
-%   Optional imput arguments passed as parameter pairs
+%  Power-law:           The following arguments are only necessary when inputs are isopach or isomass
+%        'C':           Distal integration limit (km)
+%         'T0':         Intersection of the proximal exponential segment. If the power law is requested along an exponential fit, T0 is automatically retrieved 
+%                       and needs not be specified.                   
+
+%  Weibull:             If the weibull is requested along any other fit with isopach or isomass, the ranges of n and lambda are automatically retrieved from
+%                       the VEI (Table 2 of Bonadonna and Costa, 2013, BV) if 'lambdaRange' and 'nRange' are not specified. It is always possible to specify
+%                       them, and they are required for isopleth and transects. When used, both must be specified together
+%        'nRange':      Search range for the n parameter. Vector containing the minimum and maximum boundaries
+%        'lambdaRange:  Same for the lambda parameter.
+%                               tephraFits(thickness, area, 'weibull', lambdaRange, [0.1, 1000], nRange, [0.1, 1000])
+% ______________________________________________________________________________________________________________________________________________________________
+%% Data-specific input arguments:
 %       'dataType':      Defines the type of deposit to fit
 %                       - 'isopach':    Calculates the tephra volume (km3) based on Ln(Thickness) vs. sqrt isopach area relationship (default)
 %                                       xData: square-root of isopach area (km)
@@ -75,118 +56,38 @@ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %                       - 'transect':   Thinning profile based on Ln(Thickness) vs. distance relationship
 %                                       xData: distance from source (km)
 %                                       yData: thickness (cm)
-%                       - 'isopleth':     Fining profile based on Ln(diameter of maximum clast) vs. sqrt isoleth area relationship
+%                       - 'isopleth':   Fining profile based on Ln(diameter of maximum clast) vs. sqrt isoleth area relationship
 %                                       xData: square-root of isopleth area (km)
 %                                       yData: clast diameter (cm)
-%
+% ______________________________________________________________________________________________________________________________________________________________
+%% Optional plotting arguments
 %       'yScale':       Defines the scale of the yaxis   
 %                       - 'ln':         Natural log (default)
 %                       - 'log10':      Log base 10
 %                       - 'linear':     Linear
-%
 %       'maxDistance':  Defines the maximum extent of extrapolation in distal part for plotting. 1 means 100%, i.e. the distance to the most distal point is doubled
 %                       Default = 1
-%
-%       'fits2plot':    Defines which fits to plot. If passed, it should be passed as a 1xlength(fitTypes) boolean vector
+%       'fits2plot':    Defines which fits to plot. If passed, it should be passed as a 1xlength(fitTypes) boolean vector. All fits are plotted by default
 %                       Example: if fitType = {'exponential', 'powerlaw} and 'maxDistance', [1,0] is specified, only the exponential fit will be plotted
-%                       All fits are plotted by default
-%
 %       'plotType':     - 'subplot':    Plots are inside a subplot (default)
 %                       - 'separate':   Individual plots
 %                       - 'none':       Does not produce any plot
-%
+% ______________________________________________________________________________________________________________________________________________________________
+%% Probabilistic uncertainty assessment
 %       'runMode':      - 'single':     Single volume fit (default)
 %                       - 'probabilistic': Monte Carlo simulations following the method of Biass et al. (2014). If  activated, the following arguments are required
-%
 %       'nbRuns':       Number of runs of the Monte Carlo simulation
-%
-%       'xError':       Error in % for each measurement in xData. Should be passed as a vector of the same size as xData.
-%                       Default is 10% on all points
-%
-%       'yError':       Error in % for each measurement in yData. Should be passed as a vector of the same size as yData.
-%                       Default is 10% on all points
-%
+%       'xError':       Error in % for each measurement in xData. If entered as a double, the same error is applied on all observations. Alternatively, it can be
+%                       specified as a vector of the same size as xData defining specific errors for each observation
+%       'yError':       Same as 'xError' on yData.
 %       'CError':       Error in % on the distal integration limit of the power-law. 
-%
 %       'errorType':    Error distribution around each point.
 %                       - 'normal':     Gaussian distribution where the error is 3 sigma of the distribution (default)
 %                       - 'uniform':    Uniform distribution
-%
 %       'errorBound':   Percentiles used for reporting the error. Default is [5,95] (i.e. 5th and 95th percentiles)
-%
-% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
-%
-%   Some examples for you guys!
-%
-%       1. VOLUME
-%           thickness   = [90, 40, 20, 10, 8, 5, 4, 3];
-%           area        = sqrt([0.48, 1.49, 2.68, 6.23, 9.76, 16.28, 26.19, 36.31]);
-%
-%           1.1 One exponential segment
-%               volume  = tephraFits(area, thickness, 'exponential')
-%
-%           1.2 Two exponential segment
-%               volume  = tephraFits(area, thickness, 'exponential', 'BIS', 3)
-%
-%           1.3 Two exponential segment and power-law with a distal integration limit = 20 km
-%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw'}, 'C', 20, 'BIS', 3)
-%
-%           1.4 Two exponential segment, power-law with a distal integration limit = 20 km and Weibull with initial optimization bounds based on the volume
-%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw', 'weibull'}, 'BIS', 3, 'C', 20)
-%
-%           1.5 Two exponential segment, power-law with a distal integration limit = 20 km and Weibull specifying initial n and lambda ranges
-%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw', 'weibull'}, 'BIS', 3, 'C', 20, 'lambdaRange', [.01 100], 'nRange', [.01 100] )
-%
-%       2. PLOTTING OPTIONS
-%
-%           2.1 Plot results as a subplot
-%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw', 'weibull'}, 'BIS', 3, 'C', 20)
-%
-%           2.2 Plot results as separate plots
-%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw', 'weibull'}, 'BIS', 3, 'C', 20, 'plotType', 'separate' )
-%
-%           2.3 Plot y axis of the thinning/finning trend as log10 (instead of natural log)
-%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw', 'weibull'}, 'BIS', 3, 'C', 20, 'yScale', 'log10' )
-%
-%           2.4 Extend the extrapolation
-%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw', 'weibull'}, 'BIS', 3, 'C', 20, 'maxDistance', 2)
-%
-%           2.5 Choose what fit to plot - here plotting only the Weibull
-%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw', 'weibull'}, 'BIS', 3, 'C', 20, 'fits2plot', [0,0,1])
-%
-%       3. PROBABILISTIC APPROACH
-%
-%           3.1 Run 100 1-segment exponential fits with an error of 10% on the area and 20% on the thickness
-%               volume  = tephraFits(area, thickness, 'exponential', 'runMode', 'probabilistic', 'nbRuns', 100, 'xError', 10, 'yError', 20 )
-%
-%           3.2 Same, but variable errors for each isopach
-%               xError  = [20,20,20,20,30,30,30,30];
-%               yError  = [10,10,10,10,20,20,20,20];
-%               volume  = tephraFits(area, thickness, 'exponential', 'runMode', 'probabilistic', 'nbRuns', 100, 'xError', xError, 'yError', yError )
-%
-%           3.3 Adding an error of 20% on the distal integration limit of the power-law
-%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw'}, 'C', 20, 'CError', 20, 'runMode', 'probabilistic', 'nbRuns', 100, 'xError', 10, 'yError', 20  )
-% 
-%           3.4 Use a uniform distribution of errors instead of a Gaussian
-%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw'}, 'C', 20, 'CError', 20, 'runMode', 'probabilistic', 'nbRuns', 100, 'xError', 10, 'yError', 20, 'errorType', 'uniform' )
-%
-%           3.5 Specify custom percentiles to quantify the uncertainty on the volume
-%               volume  = tephraFits(area, thickness, {'exponential', 'powerlaw'}, 'C', 20, 'CError', 20, 'runMode', 'probabilistic', 'nbRuns', 100, 'xError', 10, 'yError', 20, 'errorBound', [2,98] )
-%
-%       4. THICKNESS vs DISTANCE
-%           thickness   = [12.5, 96, 40, 16, 14, 16, 6, 13, 7, 12, 10, 26];             % Deposit thickness (cm)
-%           distance    = [0.5, 0.6, 1, 1.5 1.6, 1.7, 1.9, 2.0, 2.1, 2.4,2.6, 1.3];     % Distance from source (km)
-%
-%           4.1 Thinning trend
-%               thinning = tephraFits(distance, thickness, {'exponential', 'powerlaw'}, 'dataType', 'transect', 'C', 20)
-%
-%       5. FINING TREND (ISOPLETH)
-%           diameter    = [9,7,6,5];                                                    % Isopleth diameter (cm)
-%           area        = sqrt([1.6, 5.8, 10.0, 26.5]);                                 % Isopleth area (km)
-%
-%           5.1 Fining trend
-%               fining  = tephraFits(area, diameter, {'exponential', 'powerlaw'}, 'dataType', 'isopleth', 'C', 20)
-
+% ______________________________________________________________________________________________________________________________________________________________
+% Written by S. Biass, 2017-2018
+% GPL3 License
 
 %% Check if the first two arguments are structures, in witch case run the classification script
 if isstruct(xData) && isstruct(yData)
@@ -364,7 +265,6 @@ if ~isempty(findCell(fitType, 'exponential'))
     end
 end  
 
-
 if ~isempty(findCell(fitType, 'powerlaw'))
     % Check if distal integration limit is specified
     if isempty(findCell(varargin, 'C')) && (strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass'))
@@ -408,18 +308,13 @@ V.xData     = tmp(:,1);
 V.yData     = tmp(:,2);
 V.deposit   = C.deposit;
 
-% if exist('tmpSegments', 'var')
-%     fitSeg(xData, yData, tmpSegments);
-% end
-
-
 %% Run
-
+% Automatic search of exponential segments
 if isfield(V.fitProps, 'segments')
     V = fitSeg(V,C);
 end
 
-% If probabilstic mode
+% Probabilistic uncertainty assessment
 if strcmp(C.runMode, 'probabilistic')
     tmp      = [reshape(C.xError, length(C.xError), 1), reshape(C.yError, length(C.yError), 1)];
     C.xError = tmp(idx,1);
@@ -440,14 +335,13 @@ end
 %% Plots
 % Setup plot
 % Colormap
-%cmap = lines(length(fitType));
 cmap = [0.3639    0.5755    0.7484
         0.9153    0.2816    0.2878
         0.4416    0.7490    0.4322
         1.0000    0.5984    0.2000
         0.6769    0.4447    0.7114];
 
-% yScale
+% Work on the y axis
 ydata = cell(length(fitType),2);
 for iF = 1:length(fitType)
     if strcmp(C.yScale, 'ln')
@@ -461,8 +355,6 @@ for iF = 1:length(fitType)
         ydata{iF,2} = V.(fitType{iF}).Y;
     end
 end
-
-% Deposit type
 
 % Setup figure
 if ~strcmp(C.plotType, 'none')
@@ -682,10 +574,7 @@ if strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass')
 end
 
 function [R,V] = fitMe(V,C,fitType)
-%% Fits & volume
-
 R = struct;
-
 % Deterministic approach
     if strcmpi(fitType, 'exponential')
         [R.F,R.X,R.Y,R.r2,R.I,R.Ym] = fitEXP(V.xData, V.yData, V.fitProps.EXP_BIS, C);
@@ -757,7 +646,6 @@ end
 %% PLOTTING FUNCTIONS
 function plot_VEI(ax,V,C,fitType,cmap)
 axes(ax);
-
 % Check which field to plot (whether it is mass or volume)
 if strcmpi(C.deposit, 'isopach') && strcmpi(C.runMode, 'probabilistic')
     toPlot = 'VEI';
@@ -787,7 +675,6 @@ ylabel(ax, yl);
 
 function plot_volume(ax,V,C,fitType,cmap)
 axes(ax);
-
 % Check which field to plot (whether it is mass or volume)
 if strcmpi(C.deposit, 'isopach') && strcmpi(C.runMode, 'probabilistic')
     toPlot = 'volumeP_km3';
