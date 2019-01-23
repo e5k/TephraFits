@@ -1,4 +1,4 @@
-function [V,C] = tephraFits(xData, yData, fitType, varargin)
+ function [V,C] = tephraFits(xData, yData, fitType, varargin)
 %% TEPHRAFITS Calculate the volume/mass of tephra deposits
 %   V = tephraFits(xdata, ydata, method, deposit, ...) returns a structure
 %   containing the volume [km3] (or mass [kg]), fit details and VEI.
@@ -219,7 +219,7 @@ if strcmp(C.runMode, 'probabilistic')
 end
 
 %% Check required arguments
-fitType = sort(fitType);    % Sort alphabetically
+fitType = sort(lower(fitType));    % Sort alphabetically
 
 % Check fit types
 if isempty(findCell(fitType, 'exponential')) && isempty(findCell(fitType, 'powerlaw')) && isempty(findCell(fitType, 'weibull'))
@@ -256,7 +256,7 @@ if ~isempty(findCell(fitType, 'exponential'))
             V.fitProps.optMeth = varargin{findCell(varargin, 'optimize')+1};
         else
             V.fitProps.optMeth = 'rsq';
-            fprintf(' - No optimizing method specified, using r2. Use ''optimize'' argument to specify a method.\n')
+            fprintf(' - No optimizing method specified, using r2. Use ''optimize'' argument to specify which parameter to optimize.\n')
         end
     else
         V.fitProps.EXP_BIS = 0;
@@ -443,18 +443,28 @@ if strcmpi(fitType, 'exponential')
     out.T0          = exp(Vtmp.F(:,1));
     out.k           = Vtmp.F(:,2);
     out.I           = Vtmp.I;
-    % Half y distance
-    % If x is square root of Area, the half y distance is calculated
-    % following Pyle (1989). If not (i.e. transect) the half y distance is
-    % calculated following Nathenson (2017)
+    % Half y-value distance (b)
+    % This is where a lot of confusion comes from. For isopach/isopleth, it
+    % should be defined on a plot of y-value vs sqrt(area) and calculated following 
+    % Equation 19 of Nathenson (2017) as:
+    % bA = log(2)/k. 
+    % This contrasts with the Pyle (1989) approach, who defined it for elliptical isopachs as 
+    % b = log(2)/(k*sqrt(pi)), 
+    % which represents a distance from the vent.
+    % Here, we use bA with isopach, isomass and isopleth and br with
+    % transects. In case the exponential method is specified, br is also
+    % calculated for the classification.
     if strcmpi(C.deposit, 'isopleth')
-        out.bc      = log(2)/sqrt(pi)./-out.k;
-        %out.HB      = (out.bc - (out.bc.*(out.bc + 4*.41*7.3)).^(1/2)).^2./(4*.41^2); % Height of neutral buoyancy, equation 11 of Pyle (1989)
-        %out.HT      = out.HB/0.7; % Neutral buoyancy to plume height, Sparks (1986)
+        out.bcr     = log(2)./(-out.k.*sqrt(pi));
+        out.bcA     = log(2)./-out.k;
+    elseif strcmpi(C.deposit, 'isomass')
+        out.bmr     = log(2)./(-out.k.*sqrt(pi));
+        out.bmA     = log(2)./-out.k;
     elseif strcmpi(C.deposit, 'transect') 
-        out.bt     = log(2)./-out.k;
+        out.br      = log(2)./(-out.k.*sqrt(pi));
     else
-        out.bt      = log(2)/sqrt(pi)./-out.k;
+        out.btr     = log(2)./(-out.k.*sqrt(pi));
+        out.btA     = log(2)./-out.k;
     end
 elseif strcmpi(fitType, 'powerlaw')
     out.m           = -1*Vtmp.F(2);
@@ -510,14 +520,19 @@ if strcmpi(C.runMode, 'probabilistic')
         out.T0P         = exp(reshape(Vtmp.FP(:,1,:), size(Vtmp.FP,1),size(Vtmp.FP,3)));
         out.kP          = reshape(Vtmp.FP(:,2,:), size(Vtmp.FP,1),size(Vtmp.FP,3));
         out.IP          = reshape(Vtmp.IP, size(Vtmp.FP,1),size(Vtmp.FP,3));
+        
+        % Same comment as previously
         if strcmpi(C.deposit, 'isopleth')
-            out.bcP     = log(2)/sqrt(pi)./-out.kP;
-            %out.HBP     = (out.bcP - (out.bcP.*(out.bcP + 4*.41*7.3)).^(1/2)).^2./(4*.41^2); % Height of neutral buoyancy, equation 11 of Pyle (1989)
-            %out.HTP     = out.HBP./0.7; % Neutral buoyancy to plume height, Sparks (1986)     
+            out.bcAP     = log(2)./-out.kP;   
+            out.bcrP     = log(2)./(-out.kP.*sqrt(pi)); 
+        elseif strcmpi(C.deposit, 'isomass')
+            out.bmAP     = log(2)./-out.kP;   
+            out.bmrP     = log(2)./(-out.kP.*sqrt(pi)); 
         elseif strcmpi(C.deposit, 'transect')
-            out.btP     = log(2)./-out.kP;
+            out.brP     = log(2)./(-out.kP.*sqrt(pi));
         else
-            out.btP     = log(2)/sqrt(pi)./-out.kP;
+            out.btAP     = log(2)./-out.kP;
+            out.btrP     = log(2)./(-out.kP.*sqrt(pi));  
         end
     elseif strcmpi(fitType, 'powerlaw')
         out.mP          = -1.*reshape(Vtmp.FP(:,2,:), size(Vtmp.FP,1),size(Vtmp.FP,3));
@@ -884,7 +899,9 @@ Vseg = zeros(size(T0,1),1);
 A    = zeros(size(T0,1),1);
 for i = 1:size(T0,1)
     if i == 1   % First segment
-        Vseg(i) = 2*(T0(i))/k(i)^2;
+        Vseg(i) = 2*(T0(i))/k(i)^2;     % Equation 2 of Fierstein and Nathenson (1992)
+                                        % This is equal to equations 20a and 20b of Nathenson (2017) when
+                                        % k is substituted by log(2)/btA
     else
         A(i)    = (log(T0(i))-log(T0(i-1)))/(k(i-1)-k(i));
         k = -k;
@@ -958,18 +975,20 @@ else
     for i = 1:length(idx)-1
         % First segment
         if i == 1       
-            I(i)    = (F(i+1,1)-F(i,1))/(F(i,2)-F(i+1,2));
+            %I(i)    = (F(i+1,1)-F(i,1))/(F(i,2)-F(i+1,2));
+            I(i)    = log(exp(F(i,1))/exp(F(i+1,1)))/(F(i+1,2)-F(i,2)); % From eq 16 of Fierstein and Nathensen
             X{i}    = [0,I(i)];
-            idxS = idx(i);
+            idxS    = idx(i);
         end       
         % Last segment
         if i == length(idx)-1           
             X{i}    = [X{i-1}(end), xdata(end) + xdata(end)*C.maxDist];
-            idxS = idx(i)+1;
+            idxS    = idx(i)+1;
         end        
         % Middle segments
         if i > 1 && i < length(idx)-1   
-            I(i)    = (F(i+1,1)-F(i,1))/(F(i,2)-F(i+1,2));
+            %I(i)    = (F(i+1,1)-F(i,1))/(F(i,2)-F(i+1,2));
+            I(i)    = log(exp(F(i,1))/exp(F(i+1,1)))/(F(i+1,2)-F(i,2)); % From eq 16 of Fierstein and Nathensen
             X{i}    = [X{i-1}(end), I(i)];
             idxS = idx(i)+1;
         end
@@ -999,8 +1018,7 @@ idx     = (1:length(V.xData))';
 seg     = seg(1):seg(2);
 combs   = cell(size(seg));
 
-for i = 1:length(seg) %seg(1):seg(2)
-    
+for i = 1:length(seg)   
     if seg(i) == 1 % Test one segment
         cmb = 0;
         
@@ -1116,9 +1134,9 @@ F(1)    = mean(ydata)-F(2)*mean(xdata);
 
 %B       = (T0/10^F(1))^(-1/(-1*F(2)));                                      % Calculate proximal integration limit
 X       = linspace(.1, 10^xdata(end) + 10^xdata(end)*C.maxDist, 100);        % X vector
-Y       = 10^F(1).*X.^(F(2));                                               % Y(X)
+Y       = 10^F(1).*X.^(F(2));                                                % Y(X)
 Ym      = 10^F(1).*10.^xdata.^(F(2));
-r2      = rsquare(10.^ydata, 10^F(1).*(10.^xdata).^(F(2)));                 % R-square
+r2      = rsquare(10.^ydata, 10^F(1).*(10.^xdata).^(F(2)));                  % R-square
 
 %% WEIBULL FUNCTIONS
 function V = volWBL(theta, lambda, n)
@@ -1209,6 +1227,7 @@ h   = figure;
 ax  = axes('Parent',h);
 hold on
 if strcmpi(type, 'Pyle89')
+    % Setup plot background
     img = imread('style_Pyle89.jpg');
     img = img(:,:,1);
 
@@ -1219,22 +1238,39 @@ if strcmpi(type, 'Pyle89')
     axis ij
     ax.XScale = 'log';
     colormap(gray);
-    xlabel('Thickness half-distance b_T (km)');
-    ylabel('Half-distanceratio b_C/b_T');
+    xlabel('Thickness half-distance b_t (km)');
+    ylabel('Half-distance ratio b_c/b_t');
+    cmp = lines(numel(isopach.exponential.btr)*numel(isopleth.exponential.bcr));
     
-    leg = cell(length(isopach.exponential.bt), 1);
-    cmp = lines(length(isopach.exponential.bt));
-    P   = zeros(length(isopach.exponential.bt), 1);
-    for i = 1:length( isopach.exponential.bt )
-        if isfield(isopach.exponential, 'btP') && isfield(isopleth.exponential, 'bcP')
-            if size(isopach.exponential.btP,2) == size(isopleth.exponential.bcP,2)
-                plot( isopach.exponential.btP(i,:), isopleth.exponential.bcP(1,:)/isopach.exponential.btP(i,:), '.', 'Color', cmp(i,:))
+    
+    % Probabilistic
+    if isfield(isopach.exponential, 'btrP') && isfield(isopleth.exponential, 'bcrP')
+        btP = isopach.exponential.btrP;
+        bcP = isopleth.exponential.bcrP;
+        cmpCount = 1;
+        for i = 1:size(bcP,1)
+            for j = 1:size(btP,1)
+                plot(btP(j,:), bcP(i,:)./btP(j,:), '.', 'Color', cmp(cmpCount,:));
+                cmpCount = cmpCount + 1;
             end
         end
-        P(i)   = plot( isopach.exponential.bt(i), isopleth.exponential.bc/isopach.exponential.bt(i), 'ok', 'MarkerFaceColor', cmp(i,:));
-        leg{i} = ['b_T = ', num2str(isopach.exponential.bt(i),'%.1f')];
+    end
+    
+    % Deterministic
+    % Calculate the permutations of all bt/bc
+    [t1,t2]   = meshgrid(isopach.exponential.btr,isopleth.exponential.bcr);
+    t3        = cat(2,t1',t2');
+    t4        = reshape(t3,[],2);
+    
+    leg       = cell(size(t4, 1), 1);
+    P         = zeros(size(t4,1) ,1);
+    for i = 1:size(t4,1)
+        P(i)   = plot(t4(i,1), t4(i,2)./t4(i,1), 'ok', 'MarkerFaceColor', cmp(i,:));
+        leg{i} = sprintf('b_t = %2.1f, b_c = %2.1f', t4(i,1), t4(i,2));
     end
     legend(P,leg);
+    
+    
 elseif strcmpi(type, 'BonadonnaCosta13')
     img = imread('style_BC13.jpg');
     img = img(:,:,1);
@@ -1255,10 +1291,6 @@ elseif strcmpi(type, 'BonadonnaCosta13')
         end
     end
     
-   % lambdaThMin = ( (isopach.weibull.volume_km3 - .2*isopach.weibull.volume_km3) * 1e9/3e6)^(1/1.53);
-    
-   % volime %3?10l6?1:53
-    
     x = isopach.weibull.lambda(1);
     y = isopleth.weibull.lambda(1)/isopach.weibull.lambda(1);
     
@@ -1272,3 +1304,6 @@ end
 
 shading flat, axis tight, box on, set(ax, 'layer', 'top');
 
+if strcmpi(type, 'Pyle89')
+    ylim([0,4]);
+end

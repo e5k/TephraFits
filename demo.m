@@ -2,6 +2,12 @@
 % For help about the function, type:
 % >> help tephraFits
 
+%% Example 0: Plot the data
+clear;
+thickness	= [100, 50, 30, 20, 10, 5]; % Isopach thickness (cm)
+areaT       = [7.0, 8.9, 12.3, 17.4, 21.34, 25.4]; % Square-root of area (km)
+tephraFits(areaT, thickness);
+
 %% Example 1: Isopach
 clear;
 thickness	= [100, 50, 30, 20, 10, 5]; % Isopach thickness (cm)
@@ -38,12 +44,12 @@ thickness	= [100, 50, 30, 20, 10, 5]; % Isopach thickness (cm)
 area 		= [7.0, 8.9, 12.3, 17.4, 21.34, 25.4]; % Square-root of area (km)
 CE 			= 20; % 20% error on the distal integration limit of the power law fit
 
-% Example 1: uniform errors on xData and yData and uniform distribution of errors
+% Example 5.1: uniform errors on xData and yData and uniform distribution of errors
 thicknessE  = 10; % 10% error on all yData
 areaE 		= 10; % 10% error on all xData
 isopachP 	= tephraFits(area, thickness, {'exponential', 'powerlaw', 'weibull'}, 'BIS', 2, 'C', 200, 'lambdaRange', [.01 100], 'nRange', [.01 100], 'runMode', 'probabilistic', 'nbRuns', 100, 'errorType', 'uniform', 'xError', areaE, 'yError', thicknessE, 'CError',  CE);
 
-% Example 2: specific errors for each value on xData and yData and Normal distribution of errors
+% Example 5.2: specific errors for each value on xData and yData and Normal distribution of errors
 thicknessE  = [10, 10, 20, 20, 30, 30]; % yError varying from 10% to 30%
 areaE 		= [10, 10, 20, 20, 30, 30]; % xError varying from 10% to 30%
 isopachP 	= tephraFits(area, thickness, {'exponential', 'powerlaw', 'weibull'}, 'BIS', 2, 'C', 200, 'lambdaRange', [.01 100], 'nRange', [.01 100], 'runMode', 'probabilistic', 'nbRuns', 100, 'errorType', 'normal', 'xError', areaE, 'yError', thicknessE, 'CError',  CE);
