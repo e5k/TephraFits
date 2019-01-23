@@ -633,10 +633,10 @@ R = struct;
 % Probabilistic approach
 %fprintf(1,'\n');
 disp(['Fitting ', fitType]);
-waittext(0,'init');
+%waittext(0,'init');
 if strcmpi(C.runMode, 'probabilistic')
     for iR = 1:C.nbRuns
-        waittext(iR/C.nbRuns, 'fraction');
+        %waittext(iR/C.nbRuns, 'fraction');
         if strcmpi(fitType, 'exponential')
             [R.FP(:,:,iR), R.XP(:,:,iR), R.YP(:,:,iR), R.r2P(:,:,iR), R.IP(:,:,iR), R.YmP(:,:,iR)] =...
                 fitEXP(V.xDataP(:,:,iR), V.yDataP(:,:,iR), V.fitProps.EXP_BIS, C);
