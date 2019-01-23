@@ -2,7 +2,6 @@
 *.asv
 .DS_Store
 testPyle.m
-README.md
 README
 isopach.mat
 21c.csv
@@ -10,3 +9,4 @@ isopach.mat
 19c.csv
 19.csv
 18c.csv
+18.csv
