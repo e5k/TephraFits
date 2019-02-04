@@ -19,8 +19,8 @@ For a detail description of the usage of the function, navigate to the root of *
 Additionally, the file `demo.m` contains examples and additional updates are described at  [https://e5k.github.io](https://e5k.github.io).
 
 ## Citation
-<!-- *TephraFits* was published in *Journal of Applied Volcanology* available [here](https://www.researchgate.net/publication/306542890_TephraProb_a_Matlab_package_for_probabilistic_hazard_assessments_of_tephra_fallout?_sg=6C2i5QDp2yVVGwq6-1vysV6VPviMBwQUIultmIdieYx1rn5iIBf_idX6LFCaXxHcu-sVVOYm5Nwac8F0fpAe523tlDOATp8YTrPKxVZl.IhjyHIlIeyPY4N-EqNv8xDFe-JURfFYcvxG34tEZYWeJwcsRgzXdAcwAsCv8Np3itOrEFjcwVPR3-8vIvHiGWw) and [here](https://appliedvolc.biomedcentral.com/articles/10.1186/s13617-016-0050-5). Please cite as:
-> Biass, S., Bonadonna, C., Connor, L., Connor, C., 2016. TephraProb: a Matlab package for probabilistic hazard assessments of tephra fallout. J. Appl. Volcanol. 5, 1–16. doi:10.1186/s13617-016-0050-5 -->
+*TephraFits* was published as a Methodology paper in *Journal of Applied Volcanology* available [here](https://www.researchgate.net/publication/330399543_A_step-by-step_evaluation_of_empirical_methods_to_quantify_eruption_source_parameters_from_tephra-fall_deposits) and [here](https://appliedvolc.biomedcentral.com/articles/10.1186/s13617-018-0081-1). Please cite as:
+> Biass S, Bonadonna C, Houghton BF (2019) A step-by-step evaluation of empirical methods to quantify eruption source parameters from tephra-fall deposits. J Appl Volcanol 8:1–16
 
 ## License
 *TephraFits* is released under a GPL3 license, which means that everybody should 
