@@ -41,7 +41,7 @@ transectXW	= tephraFits(distanceXW, thicknessXW, 'exponential', 'BIS', 3, 'dataT
 %% Example 5: Uncertainty assessment
 clear;
 thickness	= [100, 50, 30, 20, 10, 5]; % Isopach thickness (cm)
-area 		= [7.0, 8.9, 12.3, 17.4, 21.34, 25.4]; % Square-root of area (km)
+areaT		= [7.0, 8.9, 12.3, 17.4, 21.34, 25.4]; % Square-root of area (km)
 CE 			= 20; % 20% error on the distal integration limit of the power law fit
 
 % Example 5.1: uniform errors on xData and yData and uniform distribution of errors
