@@ -23,6 +23,7 @@ Additionally, the file `demo.m` contains examples and additional updates are des
 ## Citation
 *TephraFits* was published as a Methodology paper in *Journal of Applied Volcanology* available [here](https://www.researchgate.net/publication/330399543_A_step-by-step_evaluation_of_empirical_methods_to_quantify_eruption_source_parameters_from_tephra-fall_deposits) and [here](https://appliedvolc.biomedcentral.com/articles/10.1186/s13617-018-0081-1). Please cite as:
 > Biass S, Bonadonna C, Houghton BF (2019) A step-by-step evaluation of empirical methods to quantify eruption source parameters from tephra-fall deposits. J Appl Volcanol 8:1–16
+
 > Biass S, Bonadonna C, Houghton BF (2019). TephraFits. [doi:10.5281/zenodo.3590642](https://zenodo.org/record/3590642#.XgBi1y2p2Vk)
 
 ## License
