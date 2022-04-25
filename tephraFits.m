@@ -72,6 +72,7 @@
 %       'plotType':     - 'subplot':    Plots are inside a subplot (default)
 %                       - 'separate':   Individual plots
 %                       - 'none':       Does not produce any plot
+%       'PLplot':     Silence the sensitivity analysis plot for the power law fit (bool; default=1)
 % ______________________________________________________________________________________________________________________________________________________________
 %% Probabilistic uncertainty assessment
 %       'runMode':      - 'single':     Single volume fit (default)
@@ -163,7 +164,12 @@ if ~isempty(findCell(varargin, 'plotType'))
 else
     C.plotType    = 'subplot';                        % Defines if plots are part of a subplot or separate figure
 end
-
+% Check PL sensitivity plot plot
+if ~isempty(findCell(varargin, 'PLplot'))         
+    C.PLplot    = varargin{findCell(varargin, 'PLplot')+1};  
+else
+    C.PLplot    = 1;                                   % If the sensitivity analysis for the distal integration limit of the power law is plotted
+end
 % In case the probabilistic mode is activated, extra checks
 if strcmp(C.runMode, 'probabilistic')
     % Check errorType
@@ -395,7 +401,7 @@ if ~strcmp(C.plotType, 'none')
     end
     
     % Plot variability of volume/mass as a function of C
-    if (strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass')) && ~isempty(findCell(fitType, 'powerlaw')) 
+    if (strcmpi(C.deposit, 'isopach') || strcmpi(C.deposit, 'isomass')) && ~isempty(findCell(fitType, 'powerlaw')) && C.PLplot==1
         if strcmpi(C.deposit, 'isopach');   toPlot = 'volume_km3';
         else;                               toPlot = 'mass_kg';
         end
